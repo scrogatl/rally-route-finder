@@ -1,3 +1,15 @@
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-08 21:37:13 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 3a05651 | Order routes for the finish instead of banking points early
+#   2026-11-08 20:19:42 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2ee171a | GraphHopper drive times (--road-time-factor) and fitPace.py
+# END LICENSE HEADER
 """Work backward from a rally's results to the planner's pace settings.
 
 For each rider it takes the bonuses they were approved for (from the scoring

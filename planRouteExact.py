@@ -1,4 +1,30 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-08 21:37:13 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 3a05651 | Order routes for the finish instead of banking points early
+#   2026-11-06 08:22:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2364b80 | Describe leg minutes as driving and stop minutes as time stopped
+#   2026-11-06 07:05:16 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 428dfd1 | Road miles from GraphHopper: --road-miles and the web app's switch
+#   2026-11-04 16:52:08 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 876aa32 | Slow zones replace avoid, with parking; archive runs; form tidying
+#   2026-11-04 11:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 1429dad | Confidence and a deadline; avoid Savannah and Augusta; web app touches
+#   2026-11-04 08:48:46 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 7e661ee | Option to leave out bonuses with hours
+#   2026-11-03 08:56:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 0b78c92 | Default to 10 hours, 50 MPH and road factor 1.23
+#   2026-11-03 08:43:05 -0500 | Scott Rogers <scott@scottandrewrogers.com> | cee577b | Leg minutes, a bonus-hours margin, and fitting a route to Google's times
+#   2026-11-02 10:43:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | d65d7a0 | Route only the listed bonuses; stop and delete web scenarios
+#   2026-11-01 16:48:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 8fce0fe | Plan around bonuses that must be visited, in any order
+#   2026-10-31 17:05:15 -0400 | Scott Rogers <scott@scottandrewrogers.com> | bccbd82 | Score combo bonuses from the rally book
+#   2026-10-31 15:21:40 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 9590099 | Plan around bonus opening hours; points in the bonus GPX; scenarios
+#   2026-10-31 09:34:34 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 19d9d5b | Show progress while the planners run
+#   2026-10-31 07:56:15 -0400 | Scott Rogers <scott@scottandrewrogers.com> | e2cdb90 | Exact solver: driving-time limits that prove days up to 8 hours
+#   2026-10-31 06:30:28 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 761d14d | Add --first, date-and-points GPX names, and Total mi in checkRoute
+#   2026-10-30 17:04:34 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 785f4f0 | Add route planners: heuristic planRoute.py and exact planRouteExact.py
+# END LICENSE HEADER
 """
 Find the provably best rally route from bonus-lat-lon-points.csv using
 Google's free OR-Tools CP-SAT solver. Everything runs locally: no Google API

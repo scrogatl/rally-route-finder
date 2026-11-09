@@ -1,4 +1,25 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-08 21:37:13 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 3a05651 | Order routes for the finish instead of banking points early
+#   2026-11-06 08:22:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2364b80 | Describe leg minutes as driving and stop minutes as time stopped
+#   2026-11-06 07:05:16 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 428dfd1 | Road miles from GraphHopper: --road-miles and the web app's switch
+#   2026-11-04 16:52:08 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 876aa32 | Slow zones replace avoid, with parking; archive runs; form tidying
+#   2026-11-04 11:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 1429dad | Confidence and a deadline; avoid Savannah and Augusta; web app touches
+#   2026-11-04 08:48:46 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 7e661ee | Option to leave out bonuses with hours
+#   2026-11-03 08:56:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 0b78c92 | Default to 10 hours, 50 MPH and road factor 1.23
+#   2026-11-03 08:43:05 -0500 | Scott Rogers <scott@scottandrewrogers.com> | cee577b | Leg minutes, a bonus-hours margin, and fitting a route to Google's times
+#   2026-11-02 10:43:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | d65d7a0 | Route only the listed bonuses; stop and delete web scenarios
+#   2026-11-02 10:04:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 5a4db15 | Offer the beam search as a quick mode, in planRoute.py and the web app
+#   2026-11-02 09:00:33 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 4f5e4f2 | Plan routes by beam search or depth-first branch and bound
+# END LICENSE HEADER
 """
 Plan a rally route by classic tree search, with tunable heuristic cut-offs.
 

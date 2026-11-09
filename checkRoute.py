@@ -1,4 +1,24 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-06 08:22:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2364b80 | Describe leg minutes as driving and stop minutes as time stopped
+#   2026-11-05 12:40:29 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 8922ff6 | Google check counts parking; route GPX loads as a Garmin trip
+#   2026-11-03 08:56:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 0b78c92 | Default to 10 hours, 50 MPH and road factor 1.23
+#   2026-11-03 08:43:05 -0500 | Scott Rogers <scott@scottandrewrogers.com> | cee577b | Leg minutes, a bonus-hours margin, and fitting a route to Google's times
+#   2026-11-02 14:17:04 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 03805c8 | Google checks: drive a percent faster or slower on highways and other roads
+#   2026-11-02 08:04:22 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 9031e6c | Check a finished web route on real roads with Google, behind GOOGLE_CHECK
+#   2026-10-31 17:05:15 -0400 | Scott Rogers <scott@scottandrewrogers.com> | bccbd82 | Score combo bonuses from the rally book
+#   2026-10-31 15:21:40 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 9590099 | Plan around bonus opening hours; points in the bonus GPX; scenarios
+#   2026-10-31 06:30:28 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 761d14d | Add --first, date-and-points GPX names, and Total mi in checkRoute
+#   2026-10-31 05:55:48 -0400 | Scott Rogers <scott@scottandrewrogers.com> | cde2373 | Check planned routes with the Google Routes API; clean up the repo
+# END LICENSE HEADER
 """
 Check a planned route against real roads with the Google Maps Routes API.
 

@@ -1,4 +1,15 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-06 07:05:16 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 428dfd1 | Road miles from GraphHopper: --road-miles and the web app's switch
+# END LICENSE HEADER
 """
 Build a table of road miles between every pair of places in the bonus file
 (Rally HQ included), from a GraphHopper server, for planRoute.py

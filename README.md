@@ -1536,3 +1536,12 @@ under regular Python (runs take about 5 minutes):
 pip install -r webapp/requirements.txt
 APP_PASSWORD=test flask --app webapp/app.py run
 ```
+
+## License
+
+Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify
+and redistribute this project, including commercially, provided you keep the
+copyright and attribution notices, include the [NOTICE](NOTICE) file, and mark
+any files you change.

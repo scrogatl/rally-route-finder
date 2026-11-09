@@ -1,3 +1,30 @@
+{#
+  BEGIN LICENSE HEADER
+  SPDX-License-Identifier: Apache-2.0
+  Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+
+  Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+  see the LICENSE and NOTICE files in the repository root.
+  Redistributions must retain this notice and the NOTICE file.
+
+  Commit history (date time tz | author <email> | commit | message):
+    2026-11-08 20:35:07 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 86fa279 | Confidence bands: days by bonuses left out to make it back
+    2026-11-05 17:48:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ef7ec62 | Scenario page: Bonus list dialog to copy the route's codes
+    2026-11-04 16:28:29 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 043ede4 | Expected score with the late penalty, and a best time budget search
+    2026-11-04 11:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 1429dad | Confidence and a deadline; avoid Savannah and Augusta; web app touches
+    2026-11-04 05:15:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | f34869f | Web app: favorite scenarios, and remember the list's sort
+    2026-11-03 12:10:24 -0500 | Scott Rogers <scott@scottandrewrogers.com> | edb0c2c | Web app: local times, and a layout that fits laptop screens
+    2026-11-03 08:43:05 -0500 | Scott Rogers <scott@scottandrewrogers.com> | cee577b | Leg minutes, a bonus-hours margin, and fitting a route to Google's times
+    2026-11-02 14:17:04 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 03805c8 | Google checks: drive a percent faster or slower on highways and other roads
+    2026-11-02 11:45:19 -0500 | Scott Rogers <scott@scottandrewrogers.com> | df6d7df | Show points per mile in the scenario list, route table and Google checks
+    2026-11-02 10:43:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | d65d7a0 | Route only the listed bonuses; stop and delete web scenarios
+    2026-11-02 08:04:22 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 9031e6c | Check a finished web route on real roads with Google, behind GOOGLE_CHECK
+    2026-11-01 17:24:38 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 76a20e6 | Name or rename a scenario from its page after it has run
+    2026-11-01 16:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2dcb1d2 | Step between scenarios from a run page with arrows or the arrow keys
+    2026-11-01 15:40:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ac96f95 | Sort the web app's tables by clicking a column heading
+    2026-11-01 13:46:31 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ef8f9bf | Add a password-protected web app for running planner scenarios
+  END LICENSE HEADER
+#}
 {% extends 'base.html' %}
 {% block title %}{{ '{:,} points'.format(run.points) if run.status == 'done' else 'Planning' }} · Rally Route Finder{% endblock %}
 {% block head %}

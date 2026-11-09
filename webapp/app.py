@@ -1,3 +1,42 @@
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-08 21:37:13 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 3a05651 | Order routes for the finish instead of banking points early
+#   2026-11-08 20:35:07 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 86fa279 | Confidence bands: days by bonuses left out to make it back
+#   2026-11-08 20:28:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 92aa59e | Confidence: the simulated rider leaves out bonuses when running late
+#   2026-11-06 20:10:13 -0500 | Scott Rogers <scott@scottandrewrogers.com> | b75be77 | Must visit: accept codes separated by commas, spaces or both
+#   2026-11-06 09:56:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 92aa773 | Avoid Atlanta: --avoid-atlanta and a web app switch
+#   2026-11-06 08:22:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2364b80 | Describe leg minutes as driving and stop minutes as time stopped
+#   2026-11-06 07:05:16 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 428dfd1 | Road miles from GraphHopper: --road-miles and the web app's switch
+#   2026-11-05 17:52:17 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ce3030e | Web app: In this order switch for must-visit bonuses
+#   2026-11-05 12:40:29 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 8922ff6 | Google check counts parking; route GPX loads as a Garmin trip
+#   2026-11-05 10:49:28 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 116a21c | Login page and a Log out button
+#   2026-11-04 16:52:08 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 876aa32 | Slow zones replace avoid, with parking; archive runs; form tidying
+#   2026-11-04 16:28:29 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 043ede4 | Expected score with the late penalty, and a best time budget search
+#   2026-11-04 11:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 1429dad | Confidence and a deadline; avoid Savannah and Augusta; web app touches
+#   2026-11-04 08:48:46 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 7e661ee | Option to leave out bonuses with hours
+#   2026-11-04 05:15:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | f34869f | Web app: favorite scenarios, and remember the list's sort
+#   2026-11-03 12:10:24 -0500 | Scott Rogers <scott@scottandrewrogers.com> | edb0c2c | Web app: local times, and a layout that fits laptop screens
+#   2026-11-03 08:56:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 0b78c92 | Default to 10 hours, 50 MPH and road factor 1.23
+#   2026-11-03 08:43:05 -0500 | Scott Rogers <scott@scottandrewrogers.com> | cee577b | Leg minutes, a bonus-hours margin, and fitting a route to Google's times
+#   2026-11-02 14:17:04 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 03805c8 | Google checks: drive a percent faster or slower on highways and other roads
+#   2026-11-02 12:10:54 -0500 | Scott Rogers <scott@scottandrewrogers.com> | c09089b | Add a /health check and a New Relic heartbeat to the web app
+#   2026-11-02 11:25:17 -0500 | Scott Rogers <scott@scottandrewrogers.com> | c8d84ce | Add an optional Athens slow zone, on the command line and in the web app
+#   2026-11-02 11:21:19 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 48adc08 | Monitor the web app with New Relic APM and Browser, when a license key is set
+#   2026-11-02 10:43:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | d65d7a0 | Route only the listed bonuses; stop and delete web scenarios
+#   2026-11-02 10:04:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 5a4db15 | Offer the beam search as a quick mode, in planRoute.py and the web app
+#   2026-11-02 08:04:22 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 9031e6c | Check a finished web route on real roads with Google, behind GOOGLE_CHECK
+#   2026-11-01 17:24:38 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 76a20e6 | Name or rename a scenario from its page after it has run
+#   2026-11-01 16:48:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 8fce0fe | Plan around bonuses that must be visited, in any order
+#   2026-11-01 16:18:25 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2dcb1d2 | Step between scenarios from a run page with arrows or the arrow keys
+#   2026-11-01 13:46:31 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ef8f9bf | Add a password-protected web app for running planner scenarios
+# END LICENSE HEADER
 """
 A small password-protected web app for running planRoute.py scenarios.
 

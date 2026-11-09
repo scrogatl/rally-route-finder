@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-06 08:22:00 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 2364b80 | Describe leg minutes as driving and stop minutes as time stopped
+#   2026-11-03 08:56:06 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 0b78c92 | Default to 10 hours, 50 MPH and road factor 1.23
+#   2026-11-01 17:24:38 -0500 | Scott Rogers <scott@scottandrewrogers.com> | dcf9b72 | List cluster members as comma-separated codes, ready to paste into Must visit
+#   2026-11-01 16:48:38 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 8ff3aec | Find where bonus points are most concentrated
+# END LICENSE HEADER
 """
 Find where the bonus points are most concentrated.
 

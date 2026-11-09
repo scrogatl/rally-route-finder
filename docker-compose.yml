@@ -1,3 +1,18 @@
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-05 10:38:53 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ad3cecb | Drop Caddy: publish the app on port 80 and the guest site on 8000
+#   2026-11-05 10:33:36 -0500 | Scott Rogers <scott@scottandrewrogers.com> | c4d955b | Guest site: a second copy of the app to share
+#   2026-11-02 11:21:19 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 48adc08 | Monitor the web app with New Relic APM and Browser, when a license key is set
+#   2026-11-02 08:04:22 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 9031e6c | Check a finished web route on real roads with Google, behind GOOGLE_CHECK
+#   2026-11-01 13:46:31 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ef8f9bf | Add a password-protected web app for running planner scenarios
+# END LICENSE HEADER
 # The web app, and optionally a guest copy of it to share. Neither does
 # HTTPS: put a tunnel in front (e.g. a Cloudflare Tunnel, which serves them
 # over HTTPS with its own certificate). Settings go in a .env file next to

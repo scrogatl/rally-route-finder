@@ -1,3 +1,15 @@
+// BEGIN LICENSE HEADER
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+//
+// Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+// see the LICENSE and NOTICE files in the repository root.
+// Redistributions must retain this notice and the NOTICE file.
+//
+// Commit history (date time tz | author <email> | commit | message):
+//   2026-11-04 05:15:39 -0500 | Scott Rogers <scott@scottandrewrogers.com> | f34869f | Web app: favorite scenarios, and remember the list's sort
+//   2026-11-01 15:40:23 -0500 | Scott Rogers <scott@scottandrewrogers.com> | ac96f95 | Sort the web app's tables by clicking a column heading
+// END LICENSE HEADER
 // Click a heading of a table.sortable to sort by that column; click again to reverse.
 // A cell's data-sort value, if any, is used in place of its text. Number columns
 // (th.num) sort highest first on the first click, text columns A to Z. A table

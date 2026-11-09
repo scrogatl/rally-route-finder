@@ -1,5 +1,16 @@
 #!/usr/bin/pyhon
 # coding=utf8
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2025-10-26 12:19:12 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 1172dd5 | initial import
+# END LICENSE HEADER
 
 """
 Converting Degrees, Minutes, Seconds formatted coordinate strings to decimal. 

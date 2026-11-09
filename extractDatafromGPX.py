@@ -1,4 +1,25 @@
 #!/usr/bin/env python
+# BEGIN LICENSE HEADER
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025-2026 Scott Rogers <scott@scottandrewrogers.com>
+#
+# Part of rally-route-finder. Licensed under the Apache License, Version 2.0;
+# see the LICENSE and NOTICE files in the repository root.
+# Redistributions must retain this notice and the NOTICE file.
+#
+# Commit history (date time tz | author <email> | commit | message):
+#   2026-11-04 08:48:46 -0500 | Scott Rogers <scott@scottandrewrogers.com> | a8738f5 | Extractor: a second GPX with symbols GPX Studio shows
+#   2026-11-02 12:05:54 -0500 | Scott Rogers <scott@scottandrewrogers.com> | 928f183 | Extractor: read Windows-encoded bonus CSVs, and add command-line help
+#   2026-10-31 17:05:15 -0400 | Scott Rogers <scott@scottandrewrogers.com> | bccbd82 | Score combo bonuses from the rally book
+#   2026-10-31 15:21:40 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 9590099 | Plan around bonus opening hours; points in the bonus GPX; scenarios
+#   2026-10-30 14:59:55 -0400 | Scott Rogers <scott@scottandrewrogers.com> | ea14948 | Update for 2026 SNAFU rally
+#   2025-10-28 11:17:13 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 6ff15f0 | Added state
+#   2025-10-27 21:38:48 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 72b7b07 | fixed notes
+#   2025-10-27 09:21:57 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 96180b2 | added comments, removed cruft
+#   2025-10-26 16:46:19 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 6141e12 | added README, persistent queue and organized into tools
+#   2025-10-26 12:43:15 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 7b7a374 | fixups
+#   2025-10-26 12:19:12 -0400 | Scott Rogers <scott@scottandrewrogers.com> | 1172dd5 | initial import
+# END LICENSE HEADER
 """
 Combine the rally's bonus files into the files the planners read.
 
