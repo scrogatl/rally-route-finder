@@ -107,6 +107,10 @@ STOP_TROUBLE_MINUTES = 10
 GAS_SPREAD = 0.3
 SIM_SKIP = True
 SKIP_RESERVE_MINUTES = 20
+# The confidence bands group days by bonuses left out: 0, 1, ... BAND_MOST or more
+BAND_MOST = 3
+# Bonuses left out on at least this share of days are named under the bands
+DROPPED_SHOWN = 0.05
 
 # The penalty for getting back late, as (minutes late up to, percent off the
 # bonus total); later than the last is a DNF, scored 0 (--late-penalty). The
@@ -1175,6 +1179,8 @@ def simulate(planner, route, days=SIM_DAYS, seed=0, skip=None):
     leg_mean, day_mean, gas_mean = (math.exp(s * s / 2) for s in (LEG_SPREAD, DAY_SPREAD, GAS_SPREAD))
     trouble_rate = 60 / STOP_TROUBLE_MINUTES
     made, back, finishes, total_score, total_given_up = 0, 0, [], 0, 0
+    # Each day's (bonuses left out or missed, points kept, back in time)
+    outcomes = []
     missed = collections.Counter()
     all_points = planner.route_points(route)
     in_route = set(route)
@@ -1230,13 +1236,40 @@ def simulate(planner, route, days=SIM_DAYS, seed=0, skip=None):
         total_given_up += all_points - score
         total_score += score * late_factor(planner.late_penalty, (elapsed - deadline) * 60)
         on_time = elapsed <= deadline + 1e-9
+        outcomes.append((len(lost), score, on_time))
         back += on_time
         made += on_time and not lost
     finishes.sort()
     timed = [b for b in route if window_of[b]]
+    # Days grouped by how many bonuses were left out or missed: 0, 1, 2, 3+
+    bands = []
+    for dropped in range(BAND_MOST + 1):
+        band = [o for o in outcomes if min(o[0], BAND_MOST) == dropped]
+        if band:
+            bands.append(dict(dropped=dropped, most=dropped == BAND_MOST, share=len(band) / days,
+                              points=sum(o[1] for o in band) / len(band),
+                              on_time=sum(o[2] for o in band) / len(band)))
+    kept = sorted(o[1] for o in outcomes)
     return dict(days=days, deadline=deadline, confidence=made / days, expected=total_score / days, on_time=back / days,
                 finish_p50=finishes[days // 2], finish_p90=finishes[int(days * 0.9)], given_up=total_given_up / days,
-                skip=skip, missed={planner.places[b]['code']: missed[b] / days for b in timed})
+                skip=skip, missed={planner.places[b]['code']: missed[b] / days for b in timed},
+                bands=bands, points_p50=kept[days // 2], points_p90=kept[days // 10],
+                dropped={planner.places[b]['code']: missed[b] / days for b in route})
+
+
+def describe_bands(planner, sim):
+    """The simulated days grouped by how many bonuses they left out or
+    missed to get back, as lines of a table, then the points kept on most
+    days and the bonuses left out most often."""
+    lines = [f"{'Bonuses left out':<17} {'Days':>5} {'Points kept':>12} {'Back in time':>13}"]
+    for band in sim['bands']:
+        label = f"{band['dropped']}{' or more' if band['most'] else ''}" if band['dropped'] else 'none'
+        lines.append(f"{label:<17} {band['share']:>5.0%} {band['points']:>12,.0f} {band['on_time']:>13.0%}")
+    lines.append(f"Points kept: {sim['points_p90']:,} or more on 90% of days, {sim['points_p50']:,} or more on half")
+    often = sorted(((rate, code) for code, rate in sim['dropped'].items() if rate >= DROPPED_SHOWN), reverse=True)
+    if often:
+        lines.append("Left out or missed most often: " + ", ".join(f"{code} {rate:.0%}" for rate, code in often[:6]))
+    return lines
 
 
 def describe_confidence(planner, sim):
@@ -1496,7 +1529,10 @@ def print_route(planner, route):
     print()
     for line in summary_lines(planner, route, legs):
         print(line)
-    print(describe_confidence(planner, simulate(planner, route)))
+    sim = simulate(planner, route)
+    print(describe_confidence(planner, sim))
+    for line in describe_bands(planner, sim):
+        print("  " + line)
 
 
 def main():

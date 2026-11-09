@@ -137,6 +137,28 @@
   <div class="summary">
     {% for line in run.summary %}<p>{{ line }}</p>{% endfor %}
     {% if run.confidence_text %}<p>{{ run.confidence_text }}</p>{% endif %}
+    {% if run.bands %}
+      <details open>
+        <summary>Bonuses left out to make it back, over 2,000 simulated days</summary>
+        <div class="table-wrap">
+          <table class="budgets">
+            <thead><tr><th>Bonuses left out</th><th class="num">Days</th><th class="num">Points kept</th><th class="num">Back in time</th></tr></thead>
+            <tbody>
+              {% for band in run.bands %}
+                <tr>
+                  <td>{% if band.dropped %}{{ band.dropped }}{% if band.most %} or more{% endif %}{% else %}none{% endif %}</td>
+                  <td class="num">{{ band.share }}%</td>
+                  <td class="num">{{ '{:,}'.format(band.points) }}</td>
+                  <td class="num">{{ band.on_time }}%</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">Points kept: {{ '{:,}'.format(run.points_p90) }} or more on 90% of days, {{ '{:,}'.format(run.points_p50) }} or more on half.
+          {% if run.dropped %}Left out or missed most often: {% for d in run.dropped %}{{ d.code }} {{ d.share }}%{% if not loop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
+      </details>
+    {% endif %}
     {% if run.budgets %}
       <details open>
         <summary>Time budgets tried, for a {{ '%g' % run.settings.deadline }}-hour deadline</summary>

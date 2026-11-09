@@ -464,7 +464,14 @@ def confidence(planner, route):
     """The run's confidence fields: the share of simulated days that go as
     planned, when half and 90% of them are back, and the line describing it."""
     sim = planRoute.simulate(planner, route)
+    often = sorted(((rate, code) for code, rate in sim['dropped'].items() if rate >= planRoute.DROPPED_SHOWN),
+                   reverse=True)[:6]
     return dict(confidence=round(sim['confidence'] * 100), expected=round(sim['expected']), given_up=round(sim['given_up']),
+                bands=[dict(dropped=band['dropped'], most=band['most'], share=round(band['share'] * 100),
+                            points=round(band['points']), on_time=round(band['on_time'] * 100))
+                       for band in sim['bands']],
+                points_p50=sim['points_p50'], points_p90=sim['points_p90'],
+                dropped=[dict(code=code, share=round(rate * 100)) for rate, code in often],
                 confidence_text=planRoute.describe_confidence(planner, sim),
                 back_by=dict(half=planRoute.time_of_day(planner, sim['finish_p50']),
                              most=planRoute.time_of_day(planner, sim['finish_p90']),
@@ -475,8 +482,8 @@ def confidence(planner, route):
 def needs_confidence(run):
     """True for a run from before confidence was simulated, before the
     deadline was a setting of its own, or before the simulated rider left
-    out bonuses when running late (no given_up)."""
-    return run['status'] == 'done' and ('given_up' not in run or 'deadline' not in run['settings'])
+    out bonuses when running late, with bands of how many (no bands)."""
+    return run['status'] == 'done' and ('bands' not in run or 'deadline' not in run['settings'])
 
 
 def add_confidence(run_id):

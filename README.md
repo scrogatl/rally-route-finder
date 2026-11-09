@@ -526,6 +526,26 @@ every bonus and comes back late: 6,773 against 4,581 for the full 10-hour
 default route. `--no-skip` simulates that rider instead, as before November
 2026; the tables below marked `--no-skip` were made that way.
 
+Under the line, the days are grouped by how many bonuses they left out (or
+reached after closing), with the points they kept and how many of them got
+back in time; the web app shows the same table on the scenario's page. For
+the full 10-hour default route:
+
+```
+  Bonuses left out   Days  Points kept  Back in time
+  none                31%        8,487           92%
+  1                   17%        7,552           93%
+  2                   13%        7,188           86%
+  3 or more           39%        6,597           72%
+  Points kept: 5,947 or more on 90% of days, 7,349 or more on half
+  Left out or missed most often: PBDY 47%, SMCH 45%, GCSU 42%, GMCM 33%, ZION 19%, CGSH 12%
+```
+
+Points kept are before the late penalty. The bonuses left out most often
+are the ones to treat as optional: here the last stops of the day, in
+Milledgeville and Macon, and SMCH. Those left out on 5% of days or more are
+named (`DROPPED_SHOWN`), and the bands stop at 3 or more (`BAND_MOST`).
+
 The 20-minute aim is `SKIP_RESERVE_MINUTES` at the top of `planRoute.py`,
 about where the expected score peaks. Even so, about 84% of simulated days
 are back on time against about 95% of 2026's riders, so the leg spread
