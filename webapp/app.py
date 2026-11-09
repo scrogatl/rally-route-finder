@@ -464,7 +464,8 @@ def confidence(planner, route):
     """The run's confidence fields: the share of simulated days that go as
     planned, when half and 90% of them are back, and the line describing it."""
     sim = planRoute.simulate(planner, route)
-    return dict(confidence=round(sim['confidence'] * 100), expected=round(sim['expected']), confidence_text=planRoute.describe_confidence(planner, sim),
+    return dict(confidence=round(sim['confidence'] * 100), expected=round(sim['expected']), given_up=round(sim['given_up']),
+                confidence_text=planRoute.describe_confidence(planner, sim),
                 back_by=dict(half=planRoute.time_of_day(planner, sim['finish_p50']),
                              most=planRoute.time_of_day(planner, sim['finish_p90']),
                              # For sorting: minutes after midnight 90% are back by
@@ -472,9 +473,10 @@ def confidence(planner, route):
 
 
 def needs_confidence(run):
-    """True for a run from before confidence was simulated, or before the
-    deadline was a setting of its own."""
-    return run['status'] == 'done' and ('expected' not in run or 'deadline' not in run['settings'])
+    """True for a run from before confidence was simulated, before the
+    deadline was a setting of its own, or before the simulated rider left
+    out bonuses when running late (no given_up)."""
+    return run['status'] == 'done' and ('given_up' not in run or 'deadline' not in run['settings'])
 
 
 def add_confidence(run_id):

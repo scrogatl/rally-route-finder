@@ -335,6 +335,7 @@ PyPy.
 | `--hours` | 10 | Time budget, Rally HQ to Rally HQ |
 | `--deadline` | `--hours` | Hours after the start you must be back by; confidence is measured against it |
 | `--late-penalty` | `15:25,30:50` | The penalty for being back late, for the expected score: up to MINUTES late, PERCENT off; later than the last is a DNF |
+| `--no-skip` | off | For the confidence, ride every bonus even when that makes you late, instead of leaving out bonuses when running late (see [Leaving out bonuses when running late](#leaving-out-bonuses-when-running-late)) |
 | `--best-budget` | off | Try budgets from the deadline down and keep the one with the highest expected score (see [Confidence](#confidence)) |
 | `--speed` | 50 | Average speed in MPH |
 | `--stop-minutes` | 5 | Time stopped at each bonus: parking, finding the sign, the photo, getting going again |
@@ -485,9 +486,11 @@ Confidence: 46% of 2,000 simulated days make every bonus and get back by 17:00; 
 
 It replays the route on 2,000 simulated days, drawing each leg's time and
 each stop at random around the plan, and counts the days that reach every
-bonus with hours before it closes and get back to HQ in time. A bonus
-reached after it closes is skipped and the day goes on. It uses no Google
-calls, and the same route always gives the same number. On each day:
+bonus and get back to HQ in time. A bonus reached after it closes is
+missed and the day goes on, and the simulated rider leaves out bonuses when
+the day runs late, as a real one does (see [Leaving out bonuses when running
+late](#leaving-out-bonuses-when-running-late)). It uses no Google calls, and
+the same route always gives the same number. On each day:
 
 | What varies | How much | Where it comes from |
 |---|---|---|
@@ -501,6 +504,34 @@ add time on average, about a minute a stop. To change these, edit
 `LEG_SPREAD`, `DAY_SPREAD`, `STOP_TROUBLE`, `STOP_TROUBLE_MINUTES` and
 `GAS_SPREAD` at the top of `planRoute.py`.
 
+#### Leaving out bonuses when running late
+
+Riders don't ride a plan into a DNF: when the day runs long they leave out
+bonuses to get back in time. In 2026, 2 of 37 riders were late, both by
+under 15 minutes. So before each bonus the simulated rider reckons the
+drive there, the stop and the drive back to HQ at the pace they've ridden
+so far (the plan's times × how much longer or shorter the day's driving has
+run), aiming to be back 20 minutes before the deadline. If that doesn't
+fit, or the bonus will have closed when they get there, they leave it out
+and try the next. The confidence line says how many points that gives up on
+an average day:
+
+```
+Confidence: 29% of 2,000 simulated days make every bonus and get back by 17:00; half are back by 16:25, 90% by 17:13; BLHD missed on 2%; skipping bonuses when running late gives up 1,058 points on an average day. Expected score 6,773 ...
+```
+
+Confidence still counts only the days that make every bonus, so it drops
+(41% to 29% for the full 10-hour default route), but the expected score is far higher than for a rider who rides
+every bonus and comes back late: 6,773 against 4,581 for the full 10-hour
+default route. `--no-skip` simulates that rider instead, as before November
+2026; the tables below marked `--no-skip` were made that way.
+
+The 20-minute aim is `SKIP_RESERVE_MINUTES` at the top of `planRoute.py`,
+about where the expected score peaks. Even so, about 84% of simulated days
+are back on time against about 95% of 2026's riders, so the leg spread
+(±30%, measured as the plan's error against Google, not a rider's
+day-to-day variation) is probably too wide: at ±15% it's 91%.
+
 #### Why a full route scores 35–50%
 
 With the time budget at the deadline, the planner fills the day: the 2026 routes finish at 9.9 to 10.0 of 10
@@ -509,12 +540,15 @@ some legs run long, so about half the simulated days go a little over. The
 14 ten-hour scenarios saved in November 2026 scored 34–49%; the three planned
 for 8¾ or 9 hours against a 10-hour deadline scored 82–86%. A low number on a full
 route doesn't mean the plan is bad; it means the plan has no slack, and the
-**90% time** says how much slack covers most days.
+**90% time** says how much slack covers most days. (Those scenarios were scored riding every bonus,
+as `--no-skip` does now; leaving out bonuses when late lowers confidence a
+little more, since a day with a bonus left out doesn't count.)
 
 #### What makes a day run long
 
 Turning each kind of variation on alone, for the 8,487-point quick route
-(10 hours, back by 17:00 as planned, with 8.3 hours of driving in 17 legs):
+(10 hours, back by 17:00 as planned, with 8.3 hours of driving in 17 legs),
+with `--no-skip`:
 
 | Varying only | Confidence | Half back by | 90% back by |
 |---|---|---|---|
@@ -546,7 +580,8 @@ budget over the deadline is refused. Scenarios saved before the deadline
 was a setting were scored again against 10 hours (or their own budget, if
 longer).
 
-With the 2026 defaults, a 10-hour deadline (17:00), in quick mode:
+With the 2026 defaults, a 10-hour deadline (17:00), in quick mode, with
+`--no-skip`:
 
 | Time budget | Points | Confidence | 90% of days back by |
 |---|---|---|---|
@@ -561,8 +596,8 @@ With the 2026 defaults, a 10-hour deadline (17:00), in quick mode:
 python planRoute.py bonus-lat-lon-points.csv --hours 8.75 --deadline 10
 ```
 
-To be back by 17:00 on nine days in ten, plan for about 8½ hours, which
-costs about 1,500 points (18%). Whether that's worth it depends on the
+To be back by 17:00 on nine days in ten while riding every bonus, plan for
+about 8½ hours, which costs about 1,500 points (18%). Whether that's worth it depends on the
 rally's penalty for being late against the points; a plan in between, say
 9 hours, is late on fewer days without giving up as much.
 
@@ -620,21 +655,18 @@ With the 2026 defaults:
 
 | Budget | Points planned | Confidence | Expected score |
 |---|---|---|---|
-| 10 h | 8,487 | 41% | 4,581 |
-| 9½ h | 7,815 | 64% | 5,897 |
-| 9 h | 7,349 | 77% | 6,221 |
-| 8¾ h | 7,233 | 85% | 6,562 |
-| **8⅝ h** | **7,092** | **90%** | **6,666** (best) |
-| 8½ h | 6,949 | 91% | 6,609 |
-| 8 h | 6,354 | 97% | 6,251 |
-| 7¾ h | 6,070 | 98% | 6,019 |
+| 10 h | 8,487 | 29% | 6,773 |
+| **9⅞ h** | **8,346** | **33%** | **6,790** (best) |
+| 9¾ h | 8,203 | 35% | 6,664 |
+| 9½ h | 7,815 | 49% | 6,636 |
+| 9¼ h | 7,439 | 52% | 6,500 |
 
-Riding the full 10 hours plans the most points but expects the fewest:
-most of its days run late, and those past 5:30 score nothing. Below 8⅝
-hours each quarter hour gives up more points than it saves in penalties.
-The best budget barely moves with the guessed spreads: gentler ones (day
-±3.5%, 1 stop in 20 running long, legs ±20%) put it at 8¾ hours, harsher
-ones (day ±10%, 1 stop in 7) at 8⅝. Either way, 8½–8¾ hours.
+Since the simulated rider leaves out bonuses rather than come back late, a
+full plan costs little: the best budget is nearly the whole day, as the
+2026 riders rode it. With `--no-skip`, the rider who rides every bonus, the
+full 10 hours expects the fewest points (4,581: most of its days run late,
+and those past 5:30 score nothing) and the best budget is 8⅝ hours (7,092
+points planned, 6,666 expected).
 
 ### Slow zones
 

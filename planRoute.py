@@ -94,12 +94,19 @@ LEG_MINUTES = 3
 # - STOP_TROUBLE: the chance a stop runs long (no parking, hard to find the
 #   sign, a wrong turn), by STOP_TROUBLE_MINUTES on average; a guess
 # - GAS_SPREAD: a gas stop's time, as for a leg
+# - SIM_SKIP: the simulated rider leaves out a bonus that would make them
+#   late, as riders do (2 of 37 were late in 2026, both by under 15 min);
+#   --no-skip rides every bonus and comes back late
+# - SKIP_RESERVE_MINUTES: how far ahead of the deadline the rider aims to be
+#   back when deciding; 20 is about where the expected score peaks; a guess
 SIM_DAYS = 2000
 LEG_SPREAD = 0.3
 DAY_SPREAD = 0.07
 STOP_TROUBLE = 0.1
 STOP_TROUBLE_MINUTES = 10
 GAS_SPREAD = 0.3
+SIM_SKIP = True
+SKIP_RESERVE_MINUTES = 20
 
 # The penalty for getting back late, as (minutes late up to, percent off the
 # bonus total); later than the last is a DNF, scored 0 (--late-penalty). The
@@ -327,7 +334,10 @@ def add_leg_args(parser):
 
 
 def timing_options(args):
-    """Planner's leg_minutes, window_margin and road miles from the command line."""
+    """Planner's leg_minutes, window_margin and road miles from the command line
+    (and the simulation's --no-skip)."""
+    global SIM_SKIP
+    SIM_SKIP = not args.no_skip
     if args.road_time_factor is not None:
         if not args.road_miles:
             sys.exit("ERROR: --road-time-factor needs --road-miles, the table GraphHopper's drive times come from")
@@ -406,6 +416,9 @@ def add_hours_args(parser):
                         help='the penalty for being back late, for the expected score: up to MINUTES late, PERCENT '
                              'off the bonus total; later than the last is a DNF; "" for a DNF as soon as you\'re late '
                              f"(default {','.join(f'{m:g}:{p:g}' for m, p in LATE_PENALTY)}, as in the 2026 rally book)")
+    parser.add_argument('--no-skip', action='store_true',
+                        help="for the confidence, ride every bonus even when that makes you late, instead of "
+                             "leaving out the next bonus when it would")
     parser.add_argument('--start', default=RALLY_START, type=start_time,
                         help=f'rally start time, HH:MM, for the hours bonuses are open (default {RALLY_START})')
     parser.add_argument('--window-margin', type=float, default=WINDOW_MARGIN, metavar='MINUTES',
@@ -1129,70 +1142,101 @@ def time_of_day(planner, hours):
     return f"{minutes // 60 % 24}:{minutes % 60:02}"
 
 
-def simulate(planner, route, days=SIM_DAYS, seed=0):
+def simulate(planner, route, days=SIM_DAYS, seed=0, skip=None):
     """Replay the route on simulated days; returns the share of days that
-    make every bonus with hours before it closes and get back in time
-    ('confidence'), the share back in time ('on_time'), the elapsed hours
-    half the days and 90% of days are back within, each bonus with hours'
-    share of days it's missed, and the average score after the late penalty
-    ('expected'). A missed bonus is skipped, its points and any combo it's in
-    lost, and the route goes on. The same route always gives the same numbers."""
+    make every bonus and get back in time ('confidence'), the share back in
+    time ('on_time'), the elapsed hours half the days and 90% of days are
+    back within, each bonus with hours' share of days it's missed, the
+    average points given up ('given_up') and the average score after the
+    late penalty ('expected'). A missed bonus loses its points and any combo
+    it's in, and the route goes on. The same route always gives the same
+    numbers.
+
+    With skip, the simulated rider rides like a real one when the day runs
+    long: before each bonus they reckon the drive there, the stop and the
+    drive from there back to Rally HQ at the pace they've ridden so far
+    (the plan's times x how much longer or shorter the day's driving has
+    run). If that would make them late, or the bonus will have closed when
+    they get there, they leave it out and go on to the next. Without skip
+    they ride every bonus and come back late."""
+    if skip is None:
+        skip = SIM_SKIP
     rng = random.Random(seed)
     hours, miles, windows = planner.hours, planner.miles, planner.windows
     gas_miles, gas_hours, stop_hours = planner.gas_miles, planner.gas_hours, planner.stop_hours
     margin = planner.window_margin / 60
-    stops = [0] + list(route) + [0]
-    # Before the loop: each leg's planned hours, gas stops made on it, and the
-    # stop's hours (opens, real closing time) if it has them
-    legs = []
-    distance = 0
-    for a, b in zip(stops, stops[1:]):
-        gas = int((distance + miles[a][b]) // gas_miles) - int(distance // gas_miles) if gas_miles else 0
-        distance += miles[a][b]
-        window = windows[b] if windows and b else None
-        legs.append((hours[a][b], gas, (window[0], window[1] + margin) if window else None, b))
+    deadline = planner.deadline
+    reserve = SKIP_RESERVE_MINUTES / 60
+    route = list(route)
+    # Each stop's hours (opens, real closing time) if it has them
+    window_of = {b: (windows[b][0], windows[b][1] + margin) if windows and windows[b] else None for b in route}
     # The mean of a lognormal is exp(sigma^2 / 2), so dividing by it keeps
     # the average time at the plan's
     leg_mean, day_mean, gas_mean = (math.exp(s * s / 2) for s in (LEG_SPREAD, DAY_SPREAD, GAS_SPREAD))
     trouble_rate = 60 / STOP_TROUBLE_MINUTES
-    made, back, finishes, total_score = 0, 0, [], 0
+    made, back, finishes, total_score, total_given_up = 0, 0, [], 0, 0
     missed = collections.Counter()
     all_points = planner.route_points(route)
+    in_route = set(route)
+
+    def drive(a, b, distance, day):
+        """Hours to drive a to b on this day, with any gas stop the odometer passes."""
+        leg = hours[a][b] * day * rng.lognormvariate(0, LEG_SPREAD) / leg_mean
+        if gas_miles:
+            for _ in range(int((distance + miles[a][b]) // gas_miles) - int(distance // gas_miles)):
+                leg += gas_hours * rng.lognormvariate(0, GAS_SPREAD) / gas_mean
+        return leg
+
     for _ in range(days):
         day = rng.lognormvariate(0, DAY_SPREAD) / day_mean
-        elapsed = 0.0
-        all_made = True
+        elapsed = distance = 0.0
+        # Hours driven so far, and the plan's hours for the same legs
+        driven = planned = 0.0
+        here = 0
         lost = set()
-        for k, (leg, gas, window, b) in enumerate(legs):
-            elapsed += leg * day * rng.lognormvariate(0, LEG_SPREAD) / leg_mean
-            for _ in range(gas):
-                elapsed += gas_hours * rng.lognormvariate(0, GAS_SPREAD) / gas_mean
-            if k == len(legs) - 1:
-                break
+        for b in route:
+            window = window_of[b]
+            if skip:
+                pace = driven / planned if planned else 1.0
+                arrive = elapsed + hours[here][b] * pace
+                if window and arrive > window[1]:
+                    lost.add(b)
+                    continue
+                done = max(arrive, window[0]) if window else arrive
+                if done + stop_hours + hours[b][0] * pace > deadline - reserve + 1e-9:
+                    lost.add(b)
+                    continue
+            leg = drive(here, b, distance, day)
+            elapsed += leg
+            driven += leg
+            planned += hours[here][b]
+            distance += miles[here][b]
+            here = b
             if window:
                 if elapsed > window[1]:
-                    missed[b] += 1
-                    all_made = False
                     lost.add(b)
                     continue
                 elapsed = max(elapsed, window[0])
             elapsed += stop_hours
             if rng.random() < STOP_TROUBLE:
                 elapsed += rng.expovariate(trouble_rate)
+        elapsed += drive(here, 0, distance, day)
         finishes.append(elapsed)
         score = all_points
         if lost:
+            missed.update(lost)
             score -= sum(planner.points[b] for b in lost) + sum(points for _, points, members in planner.combos
-                                                              if members & lost and members <= set(route))
-        total_score += score * late_factor(planner.late_penalty, (elapsed - planner.deadline) * 60)
-        on_time = elapsed <= planner.deadline + 1e-9
+                                                              if members & lost and members <= in_route)
+        total_given_up += all_points - score
+        total_score += score * late_factor(planner.late_penalty, (elapsed - deadline) * 60)
+        on_time = elapsed <= deadline + 1e-9
         back += on_time
-        made += on_time and all_made
+        made += on_time and not lost
     finishes.sort()
-    timed = [b for _, _, window, b in legs[:-1] if window]
-    return dict(days=days, deadline=planner.deadline, confidence=made / days, expected=total_score / days, on_time=back / days,
-                finish_p50=finishes[days // 2], finish_p90=finishes[int(days * 0.9)],
-                missed={planner.places[b]['code']: missed[b] / days for b in timed})
+    timed = [b for b in route if window_of[b]]
+    return dict(days=days, deadline=deadline, confidence=made / days, expected=total_score / days, on_time=back / days,
+                finish_p50=finishes[days // 2], finish_p90=finishes[int(days * 0.9)], given_up=total_given_up / days,
+                skip=skip, missed={planner.places[b]['code']: missed[b] / days for b in timed})
 
 
 def describe_confidence(planner, sim):
@@ -1207,6 +1251,9 @@ def describe_confidence(planner, sim):
     risky = sorted(((rate, code) for code, rate in sim['missed'].items() if rate >= 0.01), reverse=True)
     if risky:
         text += "; " + ", ".join(f"{code} missed on {rate:.0%}" for rate, code in risky)
+    if sim.get('skip'):
+        text += (f"; skipping bonuses when running late gives up {sim['given_up']:,.0f} points "
+                 "on an average day")
     text += (f". Expected score {sim['expected']:,.0f} after missed bonuses and the late penalty "
              f"({describe_late_penalty(planner.late_penalty)})")
     return text
