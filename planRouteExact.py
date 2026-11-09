@@ -280,7 +280,7 @@ def main():
     hq, bonuses = planRoute.load_bonuses(args.csv_file)
     bonuses = planRoute.planned_bonuses(bonuses, args)
     slow_zones = planRoute.slow_zones_from_args(args)
-    planner = planRoute.Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor, 0,
+    planner = planRoute.Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor,
                                                 slow_zones, args.gas_miles, args.gas_minutes, args.start, not args.ignore_hours,
                                 **planRoute.timing_options(args))
     planRoute.apply_first(planner, args)
@@ -303,6 +303,8 @@ def main():
     rounded_out = planner.route_points(hint) > planner.route_points(route)
     if rounded_out:
         route = hint
+    # Same stops, ordered for the best expected finish
+    route = planner.finish_order(route)
 
     points = planner.route_points(route)
     print(f"{len(bonuses)} bonuses, {args.hours} hours at {args.speed} MPH, "

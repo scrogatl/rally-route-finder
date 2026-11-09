@@ -178,7 +178,7 @@ def main():
 
     hq, bonuses = planRoute.load_bonuses(args.bonuses)
     # Hours ignored, no stops, legs or gas: route hours are just road miles / 60
-    planner = planRoute.Planner(hq, bonuses, 10000, 60, 0, planRoute.DEFAULT_ROAD_FACTOR, 0, (), 0, 0,
+    planner = planRoute.Planner(hq, bonuses, 10000, 60, 0, planRoute.DEFAULT_ROAD_FACTOR, (), 0, 0,
                                 use_hours=False, road_miles=planRoute.load_road_miles(args.road_miles))
     minutes = planRoute.load_road_miles(args.road_miles, 'minutes')
     keys = [planRoute.coordinate_key(place) for place in planner.places]

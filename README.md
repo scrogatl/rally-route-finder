@@ -351,11 +351,10 @@ PyPy.
 | `--savannah-slow-zone` | off | Add a slow zone for downtown Savannah, `32.081,-81.091,5,20,5` |
 | `--augusta-slow-zone` | off | Add a slow zone for downtown Augusta, `33.474,-82.011,3,20,5` |
 | `--max-drop` | 6 | Longest run of stops the search tries removing at once; higher is slower |
-| `--front-load` | 0 | Favor collecting points early, in case the day is cut short (see below) |
 | `--first` | none | Start with these bonuses, in this order, e.g. `CGSH,SMCH` (see below) |
 | `--must` | none | Visit these bonuses, in whatever order fits best (see below) |
 | `--only` | off | Route only the `--must` and `--first` bonuses, adding nothing else |
-| `--quick` | off | Plan with the beam search instead: about 4x faster, as good on the 2026 bonuses (see [Tree search](#tree-search-beam-and-depth-first)) |
+| `--quick` | off | Plan with the beam search instead: about 2x faster, as good on the 2026 bonuses (see [Tree search](#tree-search-beam-and-depth-first)) |
 | `--start` | 07:00 | Rally start time, for the hours bonuses are open |
 | `--window-margin` | 10 | Reach a bonus with hours at least this many minutes before it closes |
 | `--ignore-hours` | | Plan as if every bonus is open all day |
@@ -517,12 +516,12 @@ and try the next. The confidence line says how many points that gives up on
 an average day:
 
 ```
-Confidence: 29% of 2,000 simulated days make every bonus and get back by 17:00; half are back by 16:25, 90% by 17:13; BLHD missed on 2%; skipping bonuses when running late gives up 1,058 points on an average day. Expected score 6,773 ...
+Confidence: 30% of 2,000 simulated days make every bonus and get back by 17:00; half are back by 16:24, 90% by 17:11; BLHD missed on 2%; skipping bonuses when running late gives up 1,044 points on an average day. Expected score 6,841 ...
 ```
 
 Confidence still counts only the days that make every bonus, so it drops
-(41% to 29% for the full 10-hour default route), but the expected score is far higher than for a rider who rides
-every bonus and comes back late: 6,773 against 4,581 for the full 10-hour
+(43% to 30% for the full 10-hour default route), but the expected score is far higher than for a rider who rides
+every bonus and comes back late: 6,841 against 4,699 for the full 10-hour
 default route. `--no-skip` simulates that rider instead, as before November
 2026; the tables below marked `--no-skip` were made that way.
 
@@ -533,12 +532,12 @@ the full 10-hour default route:
 
 ```
   Bonuses left out   Days  Points kept  Back in time
-  none                31%        8,487           92%
-  1                   17%        7,552           93%
-  2                   13%        7,188           86%
-  3 or more           39%        6,597           72%
+  none                32%        8,487           93%
+  1                   18%        7,549           92%
+  2                   13%        7,209           85%
+  3 or more           37%        6,572           74%
   Points kept: 5,947 or more on 90% of days, 7,349 or more on half
-  Left out or missed most often: PBDY 47%, SMCH 45%, GCSU 42%, GMCM 33%, ZION 19%, CGSH 12%
+  Left out or missed most often: GCSU 46%, SMCH 45%, PBDY 40%, GMCM 32%, ZION 19%, CGSH 12%
 ```
 
 Points kept are before the late penalty. The bonuses left out most often
@@ -568,7 +567,9 @@ little more, since a day with a bonus left out doesn't count.)
 
 Turning each kind of variation on alone, for the 8,487-point quick route
 (10 hours, back by 17:00 as planned, with 8.3 hours of driving in 17 legs),
-with `--no-skip`:
+with `--no-skip`, measured before the stops were ordered for the finish
+(step 7 of [The planner in plain terms](#the-planner-in-plain-terms)), so
+today's numbers differ by a few points:
 
 | Varying only | Confidence | Half back by | 90% back by |
 |---|---|---|---|
@@ -601,7 +602,8 @@ was a setting were scored again against 10 hours (or their own budget, if
 longer).
 
 With the 2026 defaults, a 10-hour deadline (17:00), in quick mode, with
-`--no-skip`:
+`--no-skip`, measured before the stops were ordered for the finish (today
+the 10-hour route is 43% confident):
 
 | Time budget | Points | Confidence | 90% of days back by |
 |---|---|---|---|
@@ -675,16 +677,16 @@ With the 2026 defaults:
 
 | Budget | Points planned | Confidence | Expected score |
 |---|---|---|---|
-| 10 h | 8,487 | 29% | 6,773 |
-| **9⅞ h** | **8,346** | **33%** | **6,790** (best) |
-| 9¾ h | 8,203 | 35% | 6,664 |
-| 9½ h | 7,815 | 49% | 6,636 |
-| 9¼ h | 7,439 | 52% | 6,500 |
+| **10 h** | **8,487** | **30%** | **6,841** (best) |
+| 9⅞ h | 8,346 | 33% | 6,430 |
+| 9¾ h | 8,203 | 40% | 6,587 |
+| 9½ h | 7,815 | 52% | 6,514 |
+| 9¼ h | 7,439 | 52% | 6,508 |
 
 Since the simulated rider leaves out bonuses rather than come back late, a
-full plan costs little: the best budget is nearly the whole day, as the
+full plan costs little: the best budget is the whole day, as the
 2026 riders rode it. With `--no-skip`, the rider who rides every bonus, the
-full 10 hours expects the fewest points (4,581: most of its days run late,
+full 10 hours expects the fewest points (4,699: most of its days run late,
 and those past 5:30 score nothing) and the best budget is 8⅝ hours (7,092
 points planned, 6,666 expected).
 
@@ -762,23 +764,6 @@ that cuts across Atlanta is still timed at 25 MPH there. Bonuses just
 outside the circle (KSUC, HRAM, ROSE, 20-26 miles out) stay in. A
 must-visit bonus inside the circle is an unknown code.
 
-### Front-loading points
-
-If something goes wrong on rally day, the points already collected are what
-count, so it helps to bank the big bonuses early. With `--front-load`, each
-bonus counts as its points × (1 + front-load × fraction of the day left when
-you arrive):
-
-- `0` finds the highest total, then orders the stops to collect points as
-  early as the time budget allows.
-- `1` makes a bonus at the start of the day worth up to twice one at the end,
-  so the search will give up some total points to bank points sooner.
-- Higher values lean further toward early points.
-
-The output ends with a `Banked:` line showing the points collected by a
-quarter, half and three quarters of the way through the day. Compare that
-line across a few `--front-load` values to choose one.
-
 ### Choosing the first stops, or stops the route must have
 
 `--first` makes the route start with the bonuses you name, in the order you
@@ -793,10 +778,9 @@ Codes can be upper or lower case. It stops with an error if a code isn't in
 the bonus file or if those stops alone, with the drive back to Rally HQ,
 don't fit in the time budget. `planRouteExact.py` takes it too.
 
-Compare the `Banked:` line and total with a run without `--first`. On the
-2026 map, starting with CGSH and SMCH scores about 1,100 points less and
-banks less at every hour, because the normal route collects bonuses along the
-way and still reaches those two by hour 4.
+Compare the total with a run without `--first`. On the 2026 map, starting
+with CGSH and SMCH scores about 1,100 points less, because the normal route
+collects bonuses along the way and still reaches those two by hour 4.
 
 `--must` is the same idea without fixing the order: the route has to visit
 the bonuses you name, and the search decides when, around everything else.
@@ -883,17 +867,24 @@ It can't try every possible route; there are far too many.
 4. **Drop and rebuild.** Remove every run of 1 to 6 stops in a row, refill
    the gap greedily, and keep any change that scores more.
 5. **Swap.** Try replacing each stop with each bonus not in the route.
-6. **Pick the winner.** Most points wins; then the route that collects them
-   sooner; then the one that takes less time.
-7. **Bank points early.** Reorder the same stops to collect points earlier
-   where the hours allow (with front-load set, it will even give up some
-   total points for that).
+6. **Pick the winner.** Most points wins; on a tie, the one that takes less
+   time. An early point is worth no more than a late one: only the total at
+   the finish counts.
+7. **Order for the finish.** Keeping the same stops, try reversing any
+   stretch or moving any one stop, and keep the order with the highest
+   expected score at the finish (see [Confidence](#confidence)). On a day
+   that runs long you leave out the bonuses still ahead to get back in
+   time, so the order decides which ones you give up: this puts the big
+   ones where a late day is least likely to cost them. For the 2026
+   default route it raises the expected score from 6,451 (quickest order)
+   to 6,841, with the same 8,487 points.
 
 **How quick mode searches** (`--quick`, or the web app's switch): it builds
 routes one stop at a time, keeping only the 2,000 most promising at each
 step (points so far, plus 40% of an optimistic guess at what's still
 reachable), and tries only the 12 most attractive next stops from each. It
-finishes with the same drop-and-rebuild as step 4. It's faster because it
+finishes with the same drop-and-rebuild as step 4 and the same ordering as
+step 7. It's faster because it
 never reworks whole routes, but it can miss a route behind a stop that
 doesn't look attractive yet. See [Tree search](#tree-search-beam-and-depth-first).
 
@@ -916,10 +907,8 @@ give the same route.
 factor ÷ speed, slower inside a slow zone), plus the stop at each bonus, plus
 the gas stops, plus any wait for a bonus to open. A route over the time
 budget, or reaching a bonus after it closes, is rejected. Its value is its
-total points, including any combos it completes, plus the early-arrival
-credit when `--front-load` is above 0.
-When two routes are compared, the higher value wins; on a tie, the one that
-collects its points sooner; then the one that takes less time.
+total points, including any combos it completes. When two routes are
+compared, the higher value wins; on a tie, the one that takes less time.
 
 1. **Add the best-value bonus until nothing fits** (`insert_greedily`). For
    every unvisited bonus, at every place it could go in the route, work out
@@ -927,15 +916,12 @@ collects its points sooner; then the one that takes less time.
    that would go over budget, add the bonus and position with the best
    *points ÷ (extra hours) ^ weight*, and repeat. A weight above 1 favors
    nearby bonuses; below 1, it will drive farther for big ones. The one
-   bonus still missing from a combo also counts the combo's points. With
-   front-loading on, the points also count credit for arriving early, minus
-   the delay the new stop causes every stop after it.
+   bonus still missing from a combo also counts the combo's points.
 2. **Tidy the order** (`two_opt`, `orient`). Reverse any stretch of the route
-   that cuts total time, which removes places where it crosses itself. With
-   front-loading on, a reversal that raises the value is also kept, as long
-   as the route still fits. Then drive the loop in whichever direction
-   collects points sooner, and run step 1 again in case the time saved makes
-   room for another bonus.
+   that cuts total time, which removes places where it crosses itself. Then
+   drive the loop in whichever direction is quicker (road miles and bonus
+   hours can make the two differ), and run step 1 again in case the time
+   saved makes room for another bonus.
 3. **Drop stops and refill** (`local_search`). Try removing each run of 1 to
    `--max-drop` stops in a row and refilling with steps 1 and 2. Take the
    first refill that beats the current route and start over, until no
@@ -955,10 +941,12 @@ collects its points sooner; then the one that takes less time.
    fixed order, so the winner doesn't depend on how many cores there are.
 5. **Polish the winner.** Alternate a swap search (`swap_search`: replace
    each stop with each unvisited bonus, then refill) with step 3 until
-   neither helps. Then reorder the stops (`front_load_order`: reverse any
-   stretch or move any one stop) to collect points sooner within the budget,
-   without changing which bonuses are visited. Finally, check that no bonus
-   repeats and the route fits the budget.
+   neither helps. Then order the stops for the best expected finish
+   (`finish_order`: reverse any stretch or move any one stop, within the
+   budget, keeping each change that raises the expected score of the
+   simulation in [Confidence](#confidence); every candidate is scored on
+   the same 500 simulated days, so they compare fairly). Finally, check that
+   no bonus repeats and the route fits the budget.
 
 **Limits.**
 
@@ -1185,8 +1173,7 @@ With the 2026 bonus hours, it proves the same points as `planRoute.py` for
 make it slower, since it has to time every route.
 
 It takes the same options as `planRoute.py`, including gas stops, slow
-zones, bonus hours and combos, except `--front-load`; it only maximizes total
-points.
+zones, bonus hours and combos.
 
 The solver works in hundredths of a second and rounds driving times up to
 be safe, so it could rule out a route that fits with less than a second to
@@ -1253,7 +1240,7 @@ old-school AI way: a search tree. A route is built one stop at a time from
 Rally HQ. Each partial route is a node, and its children are the same route
 with one more bonus that still leaves time to get back. It takes the same
 options as `planRoute.py` (bonus hours, gas stops, slow zones, combos,
-`--first`, `--must`) except `--front-load`, prints the same table, and
+`--first`, `--must`), prints the same table, and
 writes `route-search-DATE-TIME-POINTSpts.gpx`. Like `planRoute.py`, it's much
 faster under PyPy.
 
@@ -1356,8 +1343,7 @@ other on this 8-core machine, including start-up:
 | Web test | 8,108 in 21 s | 8,108 in 5 s |
 
 It's a fast first look; for the route you'll ride, run the full search too,
-since on other data the beam may miss what the full search finds. It doesn't
-do `--front-load`.
+since on other data the beam may miss what the full search finds.
 
 ## Web app
 

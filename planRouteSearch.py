@@ -34,8 +34,7 @@ Two search methods:
 Both look at only the BRANCH best children of each node, by points per hour
 of getting there, the main cut-off: lower is faster and greedier. The
 settings, bonus hours, gas stops, slow zones, combos, --first and --must are
-the same as planRoute.py's, and so are the printout and GPX; front-loading
-isn't supported, but the route is ordered to bank points early. --polish
+the same as planRoute.py's, and so are the printout and GPX. --polish
 runs planRoute.py's drop-and-reinsert search on the result.
 
     python planRouteSearch.py                       # beam, width 2000, branch 12
@@ -347,9 +346,10 @@ _worker_search = None
 
 def quick_route(planner, workers):
     """A route by beam search with the defaults (width 2000, branch 12),
-    polished with planRoute.py's drop-and-reinsert search and ordered to bank
-    points early: about 4x faster than Planner.solve, and as good on the 2026
-    bonuses, but it may miss a better route on other data."""
+    polished with planRoute.py's drop-and-reinsert search and ordered for the
+    best expected finish (Planner.finish_order): about 2x faster
+    than Planner.solve, and as good on the 2026 bonuses, but it may miss a
+    better route on other data."""
     if planner.only:
         return planner.only_route()
     # Stops with planRoute.py's explanation if the --must stops can't fit
@@ -368,7 +368,8 @@ def quick_route(planner, workers):
         sys.exit("ERROR: found no route with every --must stop")
     planRoute.progress(f"Polishing the beam search's {best.points}-point route")
     route = planner.local_search(planner.improve(list(best.route)), 1.0, 6)
-    route = planner.front_load_order(route)
+    planRoute.progress("Ordering the stops for the best expected finish")
+    route = planner.finish_order(route)
     planRoute.progress(f"Search done: {planner.route_points(route)} points")
     print(file=sys.stderr)
     if (len(set(route)) != len(route) or planner.route_hours(route) > planner.max_hours + 1e-9
@@ -437,7 +438,7 @@ def main():
     hq, bonuses = load_bonuses(args.csv_file)
     bonuses = planRoute.planned_bonuses(bonuses, args)
     slow_zones = planRoute.slow_zones_from_args(args)
-    planner = Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor, 0,
+    planner = Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor,
                       slow_zones, args.gas_miles, args.gas_minutes, args.start, not args.ignore_hours,
                       **planRoute.timing_options(args))
     planRoute.apply_first(planner, args)
@@ -479,8 +480,8 @@ def main():
         route = planner.local_search(planner.improve(route), 1.0, 6)
         print(file=sys.stderr)
     polish_seconds = time.monotonic() - started - seconds
-    # Same stops, reordered to bank points early where the hours allow
-    route = planner.front_load_order(route)
+    # Same stops, ordered for the best expected finish
+    route = planner.finish_order(route)
     if (len(set(route)) != len(route) or planner.route_hours(route) > planner.max_hours + 1e-9
             or route[:len(planner.lead)] != planner.lead or not planner.required <= set(route)):
         sys.exit("ERROR: search produced an invalid route; this is a bug")

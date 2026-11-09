@@ -85,7 +85,6 @@ NUMBERS = [
     ('window_margin', 'Bonus hours margin, minutes', planRoute.WINDOW_MARGIN, 0, 60,
      'reach a bonus with hours this long before it closes'),
     ('road_factor', 'Road factor', planRoute.DEFAULT_ROAD_FACTOR, 1.0, 2.0, 'road miles ÷ straight-line miles; Google checks gave 1.20-1.23'),
-    ('front_load', 'Front-load', 0, 0, 5, '0 = most points; 1 trades some points for banking them earlier'),
     ('gas_miles', 'Gas stop every, miles', 175, 0, 500, '0 for no gas stops'),
     ('gas_minutes', 'Minutes per gas stop', 10, 0, 60, ''),
 ]
@@ -117,8 +116,8 @@ SWITCHES = [
     ('road_miles', 'Road miles', False,
      'real road miles between bonuses (from a GraphHopper table, buildRoadMiles.py) instead of straight-line '
      'miles x the road factor; matched Google\'s leg times better at the same speed and leg minutes'),
-    ('quick', 'Quick mode', False, 'beam search: about 4x faster and as good on the 2026 bonuses, but it may '
-                                   'miss a better route; no front-load'),
+    ('quick', 'Quick mode', False, 'beam search: about 2x faster and as good on the 2026 bonuses, but it may '
+                                   'miss a better route'),
 ]
 # How the list of runs describes a switch that's off (the slow zones,
 # leaving out timed bonuses, only and quick, off by default,
@@ -284,6 +283,9 @@ def read_form(form):
     for name, *_ in SWITCHES + SLOW_ZONES:
         settings[name] = form.get(name) == 'on'
     settings['use_hours'] = True
+    # Front-loading points is gone (an early point is worth no more than a
+    # late one); the setting stays at 0 so runs keep their IDs
+    settings['front_load'] = 0.0
     try:
         settings['start'] = planRoute.start_time(form.get('start', '').strip())
     except argparse.ArgumentTypeError as error:
@@ -311,10 +313,6 @@ def read_form(form):
         del settings['road_miles']
     if settings['only'] and not settings['must']:
         raise ValueError("Only the must-visit bonuses: list the bonuses in Must visit")
-    if settings['quick'] and settings['front_load']:
-        raise ValueError("Quick mode: set Front-load to 0, since quick mode doesn't support it")
-    if settings['best_budget'] and settings['front_load']:
-        raise ValueError("Find the best time budget: set Front-load to 0, since it plans in quick mode")
     if settings['best_budget'] and settings['only']:
         raise ValueError("Find the best time budget: turn off Only the must-visit bonuses")
     return settings
@@ -336,7 +334,8 @@ def describe(settings):
         parts.append(f"hours margin {settings['window_margin']:g} min")
     if settings.get('late_penalty', DEFAULTS['late_penalty']) != DEFAULTS['late_penalty']:
         parts.append(f"late penalty {settings['late_penalty'] or 'DNF if late'}")
-    if settings['front_load']:
+    if settings.get('front_load'):
+        # Runs planned before front-loading was removed
         parts.append(f"front-load {settings['front_load']:g}")
     if settings['gas_miles'] != 175 or settings['gas_minutes'] != 10:
         parts.append(f"gas {settings['gas_minutes']:g} min / {settings['gas_miles']:g} mi" if settings['gas_miles']
@@ -402,7 +401,7 @@ def make_planner(settings, args):
     bonuses = planRoute.planned_bonuses(bonuses, args)
     slow_zones = run_slow_zones(settings)
     planner = planRoute.Planner(hq, bonuses, settings['hours'], settings['speed'], settings['stop_minutes'],
-                                settings['road_factor'], settings['front_load'], slow_zones,
+                                settings['road_factor'], slow_zones,
                                 settings['gas_miles'], settings['gas_minutes'], settings['start'],
                                 settings['use_hours'], leg_minutes=settings.get('leg_minutes', 0),
                                 window_margin=settings.get('window_margin', 0) if settings['use_hours'] else 0,

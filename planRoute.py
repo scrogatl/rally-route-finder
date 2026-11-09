@@ -100,6 +100,9 @@ LEG_MINUTES = 3
 # - SKIP_RESERVE_MINUTES: how far ahead of the deadline the rider aims to be
 #   back when deciding; 20 is about where the expected score peaks; a guess
 SIM_DAYS = 2000
+# Simulated days per candidate order when ordering the stops for the finish
+# (finish_order); each candidate gets the same days, so they compare fairly
+ORDER_SIM_DAYS = 500
 LEG_SPREAD = 0.3
 DAY_SPREAD = 0.07
 STOP_TROUBLE = 0.1
@@ -512,7 +515,7 @@ def fraction_inside(a, b, zone):
 class Planner:
     """Stops are indexes into self.places; index 0 is Rally HQ."""
 
-    def __init__(self, hq, bonuses, hours, speed, stop_minutes, road_factor, front_load, slow_zones=(),
+    def __init__(self, hq, bonuses, hours, speed, stop_minutes, road_factor, slow_zones=(),
                  gas_miles=0, gas_minutes=0, start=RALLY_START, use_hours=True, leg_minutes=0, window_margin=0,
                  deadline=None, late_penalty=None, road_miles=None, road_minutes=None, road_time_factor=None):
         self.places = [hq] + bonuses
@@ -524,7 +527,6 @@ class Planner:
         self.deadline = deadline or hours
         self.late_penalty = LATE_PENALTY if late_penalty is None else late_penalty
         self.stop_hours = stop_minutes / 60
-        self.front_load = front_load
         self.gas_miles = gas_miles
         self.gas_hours = gas_minutes / 60
         n = len(self.places)
@@ -714,8 +716,8 @@ class Planner:
 
     def only_route(self):
         """For --only: the --first stops, then the --must stops in the
-        quickest order (trying every order of up to 8), ordered to bank points
-        early where that still fits. Stops with an error if they don't fit."""
+        quickest order (trying every order of up to 8). Stops with an error if
+        they don't fit."""
         rest = sorted(self.required - set(self.lead))
         if len(rest) <= 8:
             route = min((self.lead + list(order) for order in itertools.permutations(rest)), key=self.route_hours)
@@ -724,7 +726,7 @@ class Planner:
         if route is None or self.route_hours(route) > self.max_hours:
             # Explains why, and how long they take
             self.must_route()
-        return self.front_load_order(route)
+        return self.finish_order(route)
 
     def must_route(self):
         """The quickest route through just the --first and --must stops: by
@@ -761,41 +763,14 @@ class Planner:
         route = self.two_opt(route)
         return route if self.route_hours(route) <= self.max_hours else None
 
-    def early_points(self, route):
-        """Each bonus's points scaled by the fraction of the day left when you
-        arrive, so the same stops score higher when big ones come first."""
-        hours, miles, points, windows = self.hours, self.miles, self.points, self.windows
-        gas_miles, gas_hours, stop_hours, max_hours = self.gas_miles, self.gas_hours, self.stop_hours, self.max_hours
-        score = elapsed = distance = 0
-        previous = 0
-        for b in route:
-            leg_miles = miles[previous][b]
-            # Plus any gas stops on the way
-            gas = int((distance + leg_miles) // gas_miles) - int(distance // gas_miles) if gas_miles else 0
-            elapsed += hours[previous][b] + gas_hours * gas
-            distance += leg_miles
-            # The points count when you can take the photo, after any wait
-            if windows is not None and windows[b] and elapsed < windows[b][0]:
-                elapsed = windows[b][0]
-            score += points[b] * (1 - elapsed / max_hours)
-            elapsed += stop_hours
-            previous = b
-        return score
-
-    def route_value(self, route):
-        return self.route_points(route) + self.front_load * self.early_points(route)
-
     def orient(self, route):
-        """Driving a loop backwards takes the same time, so pick the direction
-        that collects points sooner."""
+        """Driving a loop backwards can take a different time (road miles
+        differ by direction, and bonus hours), so pick the quicker direction."""
         if self.lead:
             # Reversing would move the --first stops to the end
             return route
         backwards = route[::-1]
-        if self.windows is not None and self.route_hours(backwards) > self.max_hours:
-            # Backwards misses a bonus's hours
-            return route
-        return backwards if self.early_points(backwards) > self.early_points(route) else route
+        return backwards if self.route_hours(backwards) < self.route_hours(route) - 1e-9 else route
 
     def insert_greedily(self, route, weight=1.0):
         """Keep adding the bonus with the best points per extra hour until nothing fits.
@@ -810,8 +785,8 @@ class Planner:
         # This loop is where nearly all the run time goes, so it works from
         # local copies and does each piece of arithmetic once per pass
         hours, miles, hours_to, miles_to = self.hours, self.miles, self.hours_to, self.miles_to
-        all_points, stop_hours, max_hours = self.points, self.stop_hours, self.max_hours
-        gas_miles, gas_hours, front_load = self.gas_miles, self.gas_hours, self.front_load
+        stop_hours, max_hours = self.stop_hours, self.max_hours
+        gas_miles, gas_hours = self.gas_miles, self.gas_hours
         windows = self.windows
         # Insertions found not to fit when timed exactly; cleared after each insertion
         rejected = set()
@@ -832,14 +807,6 @@ class Planner:
                     window = windows[stops[k]]
                     limit = window[1] - (arrive[k] + wait[k]) if window else math.inf
                     slack[k] = min(limit, wait[k + 1] + slack[k + 1])
-            elif front_load:
-                # When you leave each stop
-                depart = [0.0]
-                for k in range(1, len(stops) - 1):
-                    depart.append(depart[-1] + hours[stops[k - 1]][stops[k]] + stop_hours)
-            if front_load:
-                # The points still to collect after each stop
-                later_points = [sum(all_points[s] for s in stops[k + 1:]) for k in range(len(stops) - 1)]
             gas_now = int(used_miles // gas_miles) if gas_miles else 0
             for k in range(len(self.lead), len(stops) - 1):
                 a, c = stops[k], stops[k + 1]
@@ -853,7 +820,6 @@ class Planner:
                     if windows is None:
                         if used + extra > max_hours:
                             continue
-                        photo = depart[k] + hours_from[b] if front_load else 0
                     else:
                         # Take b's photo once it's open, and check every later stop still fits
                         photo = depart[k] + hours_from[b]
@@ -867,13 +833,7 @@ class Planner:
                         delay = photo + stop_hours + hours_into[b] + gas_delay - arrive[k + 1]
                         if delay - wait[k + 1] > slack[k + 1] or (b, k) in rejected:
                             continue
-                    points = gain_points[b]
-                    if front_load:
-                        # Credit for reaching b early, minus the delay it causes every later stop
-                        gain = (points * (1 + front_load * (1 - photo / max_hours))
-                                - front_load * extra * later_points[k] / max_hours)
-                    else:
-                        gain = points
+                    gain = gain_points[b]
                     if gain <= 0:
                         continue
                     ratio = gain / max(extra, 1e-6) ** weight
@@ -897,8 +857,6 @@ class Planner:
 
     def two_opt(self, route):
         """Uncross the route to cut driving time without changing which stops are in it."""
-        if self.front_load:
-            return self.two_opt_front_loaded(route)
         if self.windows is not None:
             return self.two_opt_timed(route)
         improved = True
@@ -954,36 +912,20 @@ class Planner:
                         route, hours, improved = candidate, c_hours, True
         return route
 
-    def two_opt_front_loaded(self, route):
-        """Like two_opt, but keep a reversal that raises the value even if it
-        drives farther, as long as the route still fits in the time budget."""
-        improved = True
-        while improved:
-            improved = False
-            value, hours = self.route_value(route), self.route_hours(route)
-            for i in range(len(self.lead), len(route)):
-                for j in range(i + 1, len(route)):
-                    candidate = route[:i] + route[i:j + 1][::-1] + route[j + 1:]
-                    c_value, c_hours = self.route_value(candidate), self.route_hours(candidate)
-                    if c_hours <= self.max_hours and (c_value > value + 1e-9 or
-                                                      (c_value > value - 1e-9 and c_hours < hours - 1e-9)):
-                        route = candidate
-                        improved = True
-                        break
-                if improved:
-                    break
-        return route
-
     def improve(self, route, weight=1.0):
         return self.orient(self.insert_greedily(self.two_opt(route), weight))
 
-    def front_load_order(self, route):
-        """Reorder the stops (reverse any stretch, or move one stop) to collect
-        points sooner, as long as the route still fits in the time budget."""
+    def finish_order(self, route):
+        """The same stops in the order with the highest expected score at the
+        finish: reverse any stretch or move any one stop, as long as the route
+        still fits the budget, keeping each change that raises the simulated
+        expected score (simulate). Only the total at the finish counts, but on
+        a day that runs long the rider leaves out the bonuses still ahead, so
+        the order decides which ones they give up."""
+        value = simulate(self, route, days=ORDER_SIM_DAYS)['expected']
         improved = True
         while improved:
             improved = False
-            score = self.early_points(route)
             n, first = len(route), len(self.lead)
             moves = [route[:i] + route[i:j + 1][::-1] + route[j + 1:] for i in range(first, n) for j in range(i + 1, n)]
             # Take stop i out, then put it back at position j of what's left
@@ -991,15 +933,16 @@ class Planner:
                 rest = route[:i] + route[i + 1:]
                 moves += [rest[:j] + [route[i]] + rest[j:] for j in range(first, n) if j != i]
             for candidate in moves:
-                if self.early_points(candidate) > score + 1e-9 and self.route_hours(candidate) <= self.max_hours:
-                    route = candidate
-                    improved = True
+                if self.route_hours(candidate) > self.max_hours + 1e-9:
+                    continue
+                c_value = simulate(self, candidate, days=ORDER_SIM_DAYS)['expected']
+                if c_value > value + 1e-6:
+                    route, value, improved = candidate, c_value, True
                     break
         return route
 
     def better(self, a, b):
-        """True if route a beats route b: higher value, then points collected
-        sooner, then less time."""
+        """True if route a beats route b: more points, then less time."""
         if self.windows is not None and self.route_hours(a) > self.max_hours:
             # Dropping stops can make a route miss a bonus's hours or run over
             return False
@@ -1007,12 +950,9 @@ class Planner:
             missing_a, missing_b = len(self.required - set(a)), len(self.required - set(b))
             if missing_a != missing_b:
                 return missing_a < missing_b
-        va, vb = self.route_value(a), self.route_value(b)
-        if abs(va - vb) > 1e-9:
+        va, vb = self.route_points(a), self.route_points(b)
+        if va != vb:
             return va > vb
-        ea, eb = self.early_points(a), self.early_points(b)
-        if abs(ea - eb) > 1e-9:
-            return ea > eb
         return self.route_hours(a) < self.route_hours(b) - 1e-9
 
     def local_search(self, route, weight, max_drop):
@@ -1108,9 +1048,9 @@ class Planner:
                 break
             best = route
             polish += 1
-        # Last, since the searches above reorder stops for shortest driving
-        progress(f"Ordering stops to bank points early, {clock(time.monotonic() - started)} elapsed")
-        best = self.front_load_order(best)
+        # Last, since the searches above order the stops for the least time
+        progress(f"Ordering the stops for the best expected finish, {clock(time.monotonic() - started)} elapsed")
+        best = self.finish_order(best)
         progress(f"Search done: {self.route_points(best)} points in {clock(time.monotonic() - started)}")
         print(file=sys.stderr)
         if (len(set(best)) != len(best) or self.route_hours(best) > self.max_hours + 1e-9
@@ -1490,7 +1430,7 @@ def leg_notes(planner, leg):
 
 
 def summary_lines(planner, route, legs):
-    """The lines printed under the route table: totals, combos and points banked."""
+    """The lines printed under the route table: totals and combos."""
     last = legs[-1]
     places = planner.places
     lines = [f"Bonuses: {len(route)}   Points: {last.score}   Miles: {last.miles:.0f}   "
@@ -1505,15 +1445,6 @@ def summary_lines(planner, route, legs):
         lines.append(f"Combos: " + (", ".join(f"{code} +{points}" for code, points in done) or "none")
                      + f" ({sum(points for _, points in done)} points)"
                      + (f"; partly visited, not scored: {', '.join(partial)}" if partial else ''))
-
-    # How many points are already banked if the day is cut short
-    banked = []
-    for fraction in (0.25, 0.5, 0.75):
-        cutoff = planner.max_hours * fraction
-        # Scores only go up along the route, combos counting when completed
-        got = max(leg.score for leg in legs if leg.arrive + leg.wait <= cutoff)
-        banked.append(f"{got} ({got / last.score:.0%}) by hour {cutoff:.3g}" if last.score else f"0 by hour {cutoff:.3g}")
-    lines.append("Banked: " + ", ".join(banked))
     return lines
 
 
@@ -1550,16 +1481,11 @@ def main():
                              f'(default {DEFAULT_ROAD_FACTOR:g})')
     parser.add_argument('--max-drop', type=int, default=6,
                         help='longest run of stops the search tries dropping at once; more is slower (default 6)')
-    parser.add_argument('--front-load', type=float, default=0,
-                        help='favor collecting points early in the day: each bonus counts as its points x '
-                             '(1 + FRONT_LOAD x fraction of the day left on arrival). 0 keeps the highest total '
-                             'and just orders it to bank points early; 1 trades some total for earlier points '
-                             '(default 0)')
     parser.add_argument('--workers', type=int, default=os.cpu_count(),
                         help=f'CPU cores to search with (default all, {os.cpu_count()} here)')
     parser.add_argument('--quick', action='store_true',
-                        help="plan with planRouteSearch.py's beam search instead: about 4x faster and as good "
-                             "on the 2026 bonuses, but may miss a better route on other data; no --front-load")
+                        help="plan with planRouteSearch.py's beam search instead: about 2x faster and as good "
+                             "on the 2026 bonuses, but may miss a better route on other data")
     parser.add_argument('--gpx',
                         help='also write the route as GPX for Garmin BaseCamp and GPS units '
                              '(default route-DATE-TIME-POINTSpts.gpx)')
@@ -1578,14 +1504,11 @@ def main():
     hq, bonuses = load_bonuses(args.csv_file)
     bonuses = planned_bonuses(bonuses, args)
     slow_zones = slow_zones_from_args(args)
-    planner = Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor, args.front_load,
-                      slow_zones, args.gas_miles, args.gas_minutes, args.start, not args.ignore_hours,
+    planner = Planner(hq, bonuses, args.hours, args.speed, args.stop_minutes, args.road_factor, slow_zones, args.gas_miles, args.gas_minutes, args.start, not args.ignore_hours,
                       **timing_options(args))
     apply_first(planner, args)
     apply_combos(planner, args)
     if args.quick or args.best_budget:
-        if args.front_load:
-            sys.exit(f"ERROR: {'--quick' if args.quick else '--best-budget'} doesn't support --front-load")
         import planRouteSearch
     budgets = None
     if args.best_budget:
@@ -1605,8 +1528,8 @@ def main():
             print("  " + line)
         print()
     print(f"{len(bonuses)} bonuses, {planner.max_hours:g} hours at {args.speed} MPH, "
-          f"{args.stop_minutes:g} min per stop, {args.leg_minutes:g} per leg, {describe_roads(planner, args.road_factor)}, "
-          f"front-load {args.front_load:g}" + (", quick (beam search)" if args.quick else ""))
+          f"{args.stop_minutes:g} min per stop, {args.leg_minutes:g} per leg, {describe_roads(planner, args.road_factor)}"
+          + (", quick (beam search)" if args.quick else ""))
     print(f"{describe_gas(args)}, {describe_slow_zones(slow_zones)}, {describe_first(planner)}")
     print(f"{describe_hours(planner)}")
     print(f"{describe_combos(planner)}\n")
