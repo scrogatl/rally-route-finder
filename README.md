@@ -419,6 +419,11 @@ coordinates, so a bonus added or moved since the table was built gets the
 straight-line estimate, with a warning. `planRouteSearch.py` and
 `planRouteExact.py` take `--road-miles` too.
 
+Road miles differ by direction (one-way streets, ramps, divided highways):
+two-thirds of the 2026 pairs do, by up to 12 miles. The planner times every
+leg in the direction it's driven, including when it reverses a stretch of
+the route to uncross it.
+
 Only the miles come from GraphHopper. Time is still miles ÷ `--speed`, plus
 the slow zones and leg minutes, because that matched Google better than
 GraphHopper's own times, which have no traffic and came out slower than

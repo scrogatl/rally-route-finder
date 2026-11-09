@@ -857,21 +857,39 @@ class Planner:
             return self.two_opt_timed(route)
         improved = True
         miles = self.route_miles(route)
+        hours_of, miles_of = self.hours, self.miles
+
+        def reversal_sums(stops):
+            # Running totals of each leg driven forward and backward, so a
+            # reversal's change includes the legs inside it: road miles from
+            # GraphHopper differ by direction, so they change too
+            fwd_h, back_h, fwd_m, back_m = [0.0], [0.0], [0.0], [0.0]
+            for x, y in zip(stops, stops[1:]):
+                fwd_h.append(fwd_h[-1] + hours_of[x][y])
+                back_h.append(back_h[-1] + hours_of[y][x])
+                fwd_m.append(fwd_m[-1] + miles_of[x][y])
+                back_m.append(back_m[-1] + miles_of[y][x])
+            return fwd_h, back_h, fwd_m, back_m
+
         while improved:
             improved = False
             stops = [0] + route + [0]
+            fwd_h, back_h, fwd_m, back_m = reversal_sums(stops)
             for i in range(1 + len(self.lead), len(stops) - 2):
                 for j in range(i + 1, len(stops) - 1):
                     a, b, c, d = stops[i - 1], stops[i], stops[j], stops[j + 1]
                     # A slow zone can make a quicker leg longer in miles, so
                     # count any gas stop that adds
-                    change_miles = self.miles[a][c] + self.miles[b][d] - self.miles[a][b] - self.miles[c][d]
-                    change = (self.hours[a][c] + self.hours[b][d] - self.hours[a][b] - self.hours[c][d]
+                    change_miles = (miles_of[a][c] + miles_of[b][d] - miles_of[a][b] - miles_of[c][d]
+                                    + back_m[j] - back_m[i] - fwd_m[j] + fwd_m[i])
+                    change = (hours_of[a][c] + hours_of[b][d] - hours_of[a][b] - hours_of[c][d]
+                              + back_h[j] - back_h[i] - fwd_h[j] + fwd_h[i]
                               + self.gas_hours * (self.gas_stops(miles + change_miles) - self.gas_stops(miles)))
                     if change < -1e-9:
                         stops[i:j + 1] = reversed(stops[i:j + 1])
                         miles += change_miles
                         improved = True
+                        fwd_h, back_h, fwd_m, back_m = reversal_sums(stops)
             route = stops[1:-1]
         return route
 
