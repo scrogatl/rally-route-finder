@@ -320,13 +320,24 @@ def add_leg_args(parser):
                         help='road miles between bonuses from this table (made by buildRoadMiles.py, e.g. '
                              f'{ROAD_MILES_CSV}) instead of straight-line miles x --road-factor; a pair not in it, '
                              'or a bonus moved since, gets the straight-line estimate')
+    parser.add_argument('--road-time-factor', type=float, metavar='F',
+                        help='with --road-miles: time each leg as GraphHopper\'s drive time from the same table '
+                             'x F, instead of miles / --speed (e.g. 0.7 rides 30%% quicker than GraphHopper); the '
+                             'slow zones then add only their stop minutes, since GraphHopper already slows down in town')
 
 
 def timing_options(args):
     """Planner's leg_minutes, window_margin and road miles from the command line."""
+    if args.road_time_factor is not None:
+        if not args.road_miles:
+            sys.exit("ERROR: --road-time-factor needs --road-miles, the table GraphHopper's drive times come from")
+        if args.road_time_factor <= 0:
+            sys.exit("ERROR: --road-time-factor must be more than 0")
     return dict(leg_minutes=args.leg_minutes, window_margin=0 if args.ignore_hours else args.window_margin,
                 deadline=args.deadline, late_penalty=args.late_penalty,
-                road_miles=load_road_miles(args.road_miles) if args.road_miles else None)
+                road_miles=load_road_miles(args.road_miles) if args.road_miles else None,
+                road_minutes=load_road_miles(args.road_miles, 'minutes') if args.road_time_factor else None,
+                road_time_factor=args.road_time_factor)
 
 
 def coordinate_key(place):
@@ -334,12 +345,13 @@ def coordinate_key(place):
     return round(place['lat'], 6), round(place['lon'], 6)
 
 
-def load_road_miles(path):
-    """buildRoadMiles.py's table -> {(from (lat, lon), to (lat, lon)): road miles}."""
+def load_road_miles(path, column='miles'):
+    """buildRoadMiles.py's table -> {(from (lat, lon), to (lat, lon)): road
+    miles}, or GraphHopper's drive minutes with column='minutes'."""
     try:
         with open(path, newline='') as f:
             return {(coordinate_key(dict(lat=float(row['from_lat']), lon=float(row['from_lon']))),
-                     coordinate_key(dict(lat=float(row['to_lat']), lon=float(row['to_lon'])))): float(row['miles'])
+                     coordinate_key(dict(lat=float(row['to_lat']), lon=float(row['to_lon'])))): float(row[column])
                     for row in csv.DictReader(f)}
     except OSError as error:
         sys.exit(f"ERROR: can't read the road miles table: {error}")
@@ -351,8 +363,10 @@ def describe_roads(planner, road_factor):
     """e.g. 'road factor 1.23', or 'road miles from GraphHopper' when a table was used."""
     if planner.road_miles_missing is None:
         return f"road factor {road_factor:g}"
+    times = (f", GraphHopper's drive times x {planner.road_time_factor:g} instead of the speed"
+             if planner.road_time_factor else "")
     return "road miles from GraphHopper" + (f" (straight line x {road_factor:g} for {planner.road_miles_missing} "
-                                            "legs not in the table)" if planner.road_miles_missing else "")
+                                            "legs not in the table)" if planner.road_miles_missing else "") + times
 
 
 def parse_late_penalty(text):
@@ -483,7 +497,7 @@ class Planner:
 
     def __init__(self, hq, bonuses, hours, speed, stop_minutes, road_factor, front_load, slow_zones=(),
                  gas_miles=0, gas_minutes=0, start=RALLY_START, use_hours=True, leg_minutes=0, window_margin=0,
-                 deadline=None, late_penalty=None, road_miles=None):
+                 deadline=None, late_penalty=None, road_miles=None, road_minutes=None, road_time_factor=None):
         self.places = [hq] + bonuses
         self.start = start
         self.max_hours = hours
@@ -521,11 +535,26 @@ class Planner:
                       "moved since it was built?); they're straight line x road factor", file=sys.stderr)
         self.leg_minutes = leg_minutes
         self.window_margin = window_margin
+        # Driving hours for each leg: miles / speed through the slow zones,
+        # or with road_minutes (--road-time-factor) GraphHopper's drive time
+        # x road_time_factor where the table has the pair. GraphHopper
+        # already drives slower in town, so the slow zones' speed isn't
+        # applied on top
+        self.road_time_factor = road_time_factor if road_minutes is not None else None
+        drive = [[self.leg_hours(self.places[i], self.places[j], self.miles[i][j], speed, slow_zones)
+                  for j in range(n)] for i in range(n)]
+        if self.road_time_factor:
+            keys = [coordinate_key(place) for place in self.places]
+            for i in range(n):
+                for j in range(n):
+                    minutes = road_minutes.get((keys[i], keys[j]))
+                    if line[i][j] > SAME_PLACE_MILES and minutes is not None:
+                        drive[i][j] = minutes / 60 * road_time_factor
         # A slow zone's extra stop time (parking) goes on each leg into one
         # of its bonuses, so it counts once a stop, before the photo; a
         # bonus within WALK_MILES of the last stop shares its parking. None
         # back at Rally HQ (j = 0)
-        self.hours = [[self.leg_hours(self.places[i], self.places[j], self.miles[i][j], speed, slow_zones)
+        self.hours = [[drive[i][j]
                        + (leg_minutes / 60 if line[i][j] > SAME_PLACE_MILES else 0)
                        + (parking_hours(self.places[i], self.places[j], slow_zones) if j else 0)
                        for j in range(n)] for i in range(n)]

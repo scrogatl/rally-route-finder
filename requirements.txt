@@ -2,3 +2,4 @@ pandas
 ortools
 requests
 pypdf
+openpyxl

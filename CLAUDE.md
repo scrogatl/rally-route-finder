@@ -16,6 +16,8 @@ the whole file (it is over 1,000 lines).
   GraphHopper (route-camp's, port 8989) -> `bonus-road-miles.csv`, for
   `--road-miles` and the web app's Road miles switch
 - `checkRoute.py`: checks a route with the Google Maps Routes API (billed)
+- `fitPace.py`: rally results workbook -> the `--speed`, `--stop-minutes` and
+  `--road-time-factor` the riders rode at (least squares; needs openpyxl)
 - `webapp/`: Flask app (`app.py`, templates, static); runs under PyPy in Docker
 - `docker-compose.yml`: `app` on port 80, optional `guest` site on 8000
   (`COMPOSE_PROFILES=guest`); HTTPS comes from a Cloudflare Tunnel

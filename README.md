@@ -341,6 +341,7 @@ PyPy.
 | `--leg-minutes` | 3 | Driving time every leg takes on top of miles ÷ speed: off the main road and through local streets to the bonus. None between bonuses at the same spot (see below) |
 | `--road-factor` | 1.23 | Multiplies straight-line miles to approximate road miles (Google checks of 2026 routes gave 1.20-1.23) |
 | `--road-miles` | none | Road miles between bonuses from this table (`bonus-road-miles.csv`, made by `buildRoadMiles.py`) instead of straight line × road factor (see [Road miles from GraphHopper](#road-miles-from-graphhopper)) |
+| `--road-time-factor` | none | With `--road-miles`: time each leg as GraphHopper's drive time × this, instead of miles ÷ `--speed` (see [GraphHopper's drive times, scaled](#graphhoppers-drive-times-scaled)) |
 | `--gas-miles` | 175 | Stop for gas each time the route passes another this many miles; 0 for none |
 | `--gas-minutes` | 10 | Time for each gas stop |
 | `--slow-zone` | Atlanta | `LAT,LON,RADIUS_MILES,MPH[,STOP_MINUTES]`: the part of any leg inside this circle goes at MPH, and each bonus inside it takes STOP_MINUTES more. Repeat for more zones; the default is `33.78,-84.39,15,25,0` |
@@ -424,7 +425,8 @@ two-thirds of the 2026 pairs do, by up to 12 miles. The planner times every
 leg in the direction it's driven, including when it reverses a stretch of
 the route to uncross it.
 
-Only the miles come from GraphHopper. Time is still miles ÷ `--speed`, plus
+By default only the miles come from GraphHopper (`--road-time-factor`, below,
+uses its drive times too). Time is still miles ÷ `--speed`, plus
 the slow zones and leg minutes, because that matched Google better than
 GraphHopper's own times, which have no traffic and came out slower than
 Google's. On the 73 different legs in the saved Google checks (Saturday
@@ -444,6 +446,30 @@ mostly slow in-town legs, which the slow zones and leg minutes cover; the
 Athens slow zone mostly fixed winding roads, which road miles now handle, so
 it's probably not needed with them. 73 legs from one forecast is a small
 sample: treat it as a rough fit.
+
+#### GraphHopper's drive times, scaled
+
+One speed for every road is right for nobody: an interstate leg and a
+two-lane leg get the same 50 MPH. GraphHopper's drive times know the road
+types, but come out slow for a rally rider. `--road-time-factor F` times
+each leg as GraphHopper's drive time × F instead of miles ÷ `--speed`, so a
+rider who rides 40% quicker than GraphHopper everywhere is `0.6`:
+
+```bash
+python planRoute.py --road-miles bonus-road-miles.csv --road-time-factor 0.6 --leg-minutes 0
+```
+
+It needs `--road-miles`, since the times come from the same table, and
+`--speed` is then used only for a leg the table doesn't have. GraphHopper
+already slows down in town, so the slow zones' speeds aren't applied on top;
+their extra stop minutes still are. GraphHopper's time runs to the bonus's
+door, so `--leg-minutes 0` is the natural pairing. `planRouteSearch.py` and
+`planRouteExact.py` take it too; the web app doesn't have it yet.
+
+The 2026 winner's 20 bonuses (618 road miles in their own order) take 9.5
+hours at `0.5` with 5-minute stops: about twice GraphHopper's pace. Check
+your own factor with `fitPace.py` (see [Fitting speed and stop time to real
+results](#fitting-speed-and-stop-time-to-real-results)).
 
 ### Confidence
 
@@ -893,6 +919,67 @@ collects its points sooner; then the one that takes less time.
   gives real road miles; the speed is still one average either way.
 - Gas stops are counted for every `--gas-miles` driven in total. Where in
   the day they fall, and whether a station is nearby, isn't considered.
+
+## Fitting speed and stop time to real results
+
+`fitPace.py` works backward from a rally's results to `--speed`,
+`--stop-minutes` and `--road-time-factor`: how fast did the riders ride, and
+how long did they stop, to cover their bonuses in the time they had? It reads
+the scoring workbook (the [snafu-rally-scoring](https://github.com/scrogatl/snafu-rally-scoring)
+layout, downloaded as `.xlsx`) and, for each rider:
+
+- takes the bonuses they were approved for, leaving out combos and any code
+  not in the bonus file (2026's BOLO and PBON);
+- routes them the shortest way by GraphHopper road miles (`bonus-road-miles.csv`),
+  and sums GraphHopper's drive time along that route;
+- takes their hours as the whole rally, 10 (`--hours`), since riders use all
+  the time they have; a late penalty adds the middle of its window (7½ min
+  for 25% off);
+- takes off gas stops (`--gas-miles`, `--gas-minutes`, as the planner).
+
+Then it fits, by least squares, for the top finishers (`--top`, 10) and for
+everyone with 5 or more bonuses on the map:
+
+    hours - gas = miles / speed + stops x stop minutes
+    hours - gas = GraphHopper's drive time x factor + stops x stop minutes
+
+and prints the planner settings each fit gives. The workbook's submit and
+approve times are when emails arrived, not when the rider was at the bonus,
+so they aren't used. It needs `openpyxl` (in `requirements.txt`).
+
+```bash
+.venv/bin/python fitPace.py SNAFU_2026/results-2026.xlsx --stop-minutes 5
+```
+
+With every rider at the same 10 hours, only the spread in miles and stops
+separates speed from stop time, and that split comes out loose (the 2026 top
+ten fit 1.2-minute stops). `--stop-minutes` fixes the stop time and fits only
+the speed and factor, which is steadier. The 2026 results:
+
+| Riders | Stop minutes | `--speed` | `--road-time-factor` |
+|---|---|---|---|
+| Top 10 | 5 | 62 | 0.71 |
+| Top 10 | 8 | 69 | 0.63 |
+| All 34 | 5 | 52 | 0.85 |
+| All 34 | 8 | 57 | 0.78 |
+
+The top ten rode well above the planner's default 50 MPH, and the winner
+(609 road miles, 20 bonuses) about 78 MPH at 5-minute stops, or
+GraphHopper × 0.57. That's why the planner went north at its defaults while
+the winner went south: at 60-65 MPH or more the southern routes fit.
+
+**Real miles and hours.** Once known, put them in a CSV and pass it with
+`--actuals`; a blank cell keeps the estimate. `--write-actuals FILE` writes
+one listing every rider, to fill in:
+
+```bash
+.venv/bin/python fitPace.py SNAFU_2026/results-2026.xlsx --write-actuals SNAFU_2026/actuals-2026.csv
+.venv/bin/python fitPace.py SNAFU_2026/results-2026.xlsx --actuals SNAFU_2026/actuals-2026.csv
+```
+
+The table marks estimates with `~mi` and `~h`. `--csv FILE` writes the
+per-rider table. Keep the results and actuals in the rally folder: like the
+other rally data, they stay out of git.
 
 ## Checking the route with Google Maps
 
