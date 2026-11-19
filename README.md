@@ -1373,6 +1373,11 @@ gives each a public HTTPS address with no ports opened on the router, and
 Tailscale works for your own machines. Without one, the password crosses
 the network in the clear.
 
+The login cookie is marked secure, so browsers send it only over HTTPS. If
+you reach the site over plain `http://` (e.g. Tailscale without HTTPS, or a
+local network), logging in will seem to do nothing: add `SECURE_COOKIE=off`
+to `.env`, then `docker compose up -d`.
+
 1. A Linux machine with Docker (`curl -fsSL https://get.docker.com | sh`),
    e.g. a desktop at home or a cloud server with 4 or more vCPUs and 4–8 GB
    of memory. More vCPUs make each run faster.
@@ -1408,7 +1413,29 @@ bonus data on the server yet". To fix that, run `docker compose down`, remove
 the empty `data/`, then do step 2's copy again and start it.
 
 Then open the tunnel's address and log in with the password from `.env`. A
-login lasts 30 days in that browser; **Log out**, at the top right, ends it.
+login lasts 30 days in that browser (7 on the guest site); **Log out**, at
+the top right, ends it. To change that, set `LOGIN_DAYS` (and
+`GUEST_LOGIN_DAYS` for the guest site) in `.env` to the number of days.
+
+Wrong passwords lock out guessing: 10 from one address in 10 minutes and
+that address gets "Too many wrong passwords" until the oldest of them is 10
+minutes old, even with the right password. 100 from everyone together in
+10 minutes stops new logins for all, so someone who reaches the server
+past Cloudflare can't guess quickly by faking addresses; browsers already
+logged in carry on. The address is Cloudflare's `CF-Connecting-IP`, so
+behind a tunnel each visitor counts separately. The counts are kept in
+memory, so restarting the app clears a lockout.
+
+Every login, logout, wrong password and lockout goes to the log
+(`docker compose logs app`, or `guest`) with the visitor's address and how
+close it is to a lockout, e.g.
+
+    WARNING in app: wrong password from 203.0.113.7 (3 of 10 in 10 minutes; 3 of 100 from everyone)
+    WARNING in app: login refused from 203.0.113.7: locked out for 8 more minutes (10 wrong from it, 10 from everyone, in 10 minutes)
+    INFO in app: login from 198.51.100.4
+
+The password typed is never logged. To see only these:
+`docker compose logs app | grep -E 'login|logout|password'`.
 
 - **New bonus data:** run step 1 again here, and copy the two CSVs into
   `data/` on the server as in step 2. No restart needed; runs with the new
@@ -1453,7 +1480,8 @@ login lasts 30 days in that browser; **Log out**, at the top right, ends it.
       COMPOSE_PROFILES=guest
       GUEST_PASSWORD=the-guest-site-password
 
-  then `docker compose up -d --build`. It's on port 8000, for a tunnel to
+  then `docker compose up -d --build`. A guest's login lasts 7 days unless
+  you set `GUEST_LOGIN_DAYS`. It's on port 8000, for a tunnel to
   publish, e.g. a Cloudflare Tunnel public hostname pointing at
   `http://localhost:8000`. A new build updates both sites. Its logs are
   `docker compose logs -f guest`.
@@ -1526,7 +1554,7 @@ site, and New Relic leaves its requests out of the app's statistics.
 
 ```bash
 docker build -t rally-route-finder .
-docker run --rm -p 8000:8000 -e APP_PASSWORD=test -v "$PWD:/data:ro" -v "$PWD/web-scenarios:/results" rally-route-finder
+docker run --rm -p 8000:8000 -e APP_PASSWORD=test -e SECURE_COOKIE=off -v "$PWD:/data:ro" -v "$PWD/web-scenarios:/results" rally-route-finder
 ```
 
 Then open <http://localhost:8000> (password `test`). Or without Docker,
@@ -1534,7 +1562,7 @@ under regular Python (runs take about 5 minutes):
 
 ```bash
 pip install -r webapp/requirements.txt
-APP_PASSWORD=test flask --app webapp/app.py run
+APP_PASSWORD=test SECURE_COOKIE=off flask --app webapp/app.py run
 ```
 
 ## License

@@ -51,6 +51,10 @@ Google Maps Routes API, as checkRoute.py does.
 Environment:
     APP_PASSWORD     required; the password for the whole site, asked for on a
                      login page; changing it logs everyone out
+    LOGIN_DAYS       how long a login lasts in a browser (default 30)
+    SECURE_COOKIE    'off' lets the login cookie go over plain http, for a
+                     site without HTTPS (e.g. over Tailscale) or local testing
+                     in Safari; leave it on behind an HTTPS tunnel (default: on)
     DATA_DIR         folder with bonus-lat-lon-points.csv and bonus-combos.csv
                      from extractDatafromGPX.py (default: the repo folder)
     RESULTS_DIR      where runs are saved (default: DATA_DIR/web-scenarios)
@@ -65,9 +69,10 @@ Environment:
                      on every page (default: off)
     NEW_RELIC_APP_NAME     the app's name in New Relic (default Rally Route Finder)
 
-    APP_PASSWORD=secret flask --app webapp/app.py run    # to try it locally
+    APP_PASSWORD=secret SECURE_COOKIE=off flask --app webapp/app.py run    # to try it locally
 """
-import argparse, glob, hashlib, hmac, json, math, os, queue, re, shutil, sys, threading, time
+import argparse, glob, hashlib, hmac, json, logging, math, os, queue, re, shutil, sys, threading, time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -98,6 +103,8 @@ ARCHIVE_DIR = os.path.join(RESULTS_DIR, 'archives')
 WORKERS = int(os.environ.get('PLANNER_WORKERS') or os.cpu_count())
 GOOGLE_CHECK = os.environ.get('GOOGLE_CHECK', '').lower() in ('on', '1', 'true', 'yes')
 GMAPS_API_KEY = os.environ.get('GMAPS_API_KEY', '')
+LOGIN_DAYS = float(os.environ.get('LOGIN_DAYS') or 30)
+SECURE_COOKIE = os.environ.get('SECURE_COOKIE', 'on').lower() not in ('off', '0', 'false', 'no')
 if GOOGLE_CHECK:
     if not GMAPS_API_KEY:
         sys.exit("ERROR: GOOGLE_CHECK is on, so set GMAPS_API_KEY to your Google Maps API key")
@@ -178,7 +185,47 @@ app = Flask(__name__)
 _site_key = hmac.new(PASSWORD.encode(), b'rally-route-finder session', hashlib.sha256)
 app.secret_key = _site_key.digest()
 app.config.update(SESSION_COOKIE_NAME='rally_' + _site_key.hexdigest()[:10],
-                  SESSION_COOKIE_SAMESITE='Lax', PERMANENT_SESSION_LIFETIME=timedelta(days=30))
+                  SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=SECURE_COOKIE,
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=LOGIN_DAYS))
+# Logins, wrong passwords and lockouts go to the log (docker compose logs),
+# with the visitor's address; never the password typed
+app.logger.setLevel(logging.INFO)
+
+# Wrong passwords, to stop guessing: 10 from one address in 10 minutes locks
+# that address out until the oldest is 10 minutes old, and 100 from everyone
+# together locks out new logins for all (logged-in browsers carry on). The
+# cap for all keeps guessing slow even from someone who reaches the server
+# past Cloudflare and makes up a new address for every guess
+LOCKOUT_WINDOW = 600
+LOCKOUT_PER_ADDRESS = 10
+LOCKOUT_ALL = 100
+failed_logins = {}          # address -> times of its wrong passwords, oldest first
+all_failed_logins = deque()
+login_lock = threading.Lock()
+
+
+def client_address():
+    """The visitor's address: Cloudflare's header for it, behind a tunnel."""
+    return request.headers.get('CF-Connecting-IP') or request.remote_addr or ''
+
+
+def locked_out_for(address, now):
+    """Seconds until this address may try again, or 0. Call with login_lock."""
+    cutoff = now - LOCKOUT_WINDOW
+    while all_failed_logins and all_failed_logins[0] <= cutoff:
+        all_failed_logins.popleft()
+    for key in [k for k, times in failed_logins.items() if times[-1] <= cutoff]:
+        del failed_logins[key]
+    times = failed_logins.get(address)
+    if times:
+        while times[0] <= cutoff:
+            times.popleft()
+    waits = [0]
+    if times and len(times) >= LOCKOUT_PER_ADDRESS:
+        waits.append(times[-LOCKOUT_PER_ADDRESS] + LOCKOUT_WINDOW - now)
+    if len(all_failed_logins) >= LOCKOUT_ALL:
+        waits.append(all_failed_logins[-LOCKOUT_ALL] + LOCKOUT_WINDOW - now)
+    return max(waits)
 
 
 @app.context_processor
@@ -229,21 +276,40 @@ def safe_next(target):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    error = None
+    error, status = None, 200
     if request.method == 'POST':
-        if hmac.compare_digest(request.form.get('password', '').encode(), PASSWORD.encode()):
+        address, now = client_address(), time.time()
+        with login_lock:
+            wait = locked_out_for(address, now)
+            right = not wait and hmac.compare_digest(request.form.get('password', '').encode(), PASSWORD.encode())
+            if not wait and not right:
+                failed_logins.setdefault(address, deque()).append(now)
+                all_failed_logins.append(now)
+            tries = len(failed_logins.get(address, ()))
+            all_tries = len(all_failed_logins)
+        if right:
+            app.logger.info(f"login from {address}")
             session.clear()
             session.permanent = True
             session['logged_in'] = True
             return redirect(safe_next(request.form.get('next')))
-        # Slows down guessing
-        time.sleep(1)
-        error = "That's not the password"
-    return render_template('login.html', error=error, next=request.values.get('next', '')), 401 if error else 200
+        if wait:
+            minutes = max(1, math.ceil(wait / 60))
+            error = f"Too many wrong passwords. Try again in {minutes} minute{'s' if minutes > 1 else ''}"
+            status = 429
+            app.logger.warning(f"login refused from {address}: locked out for {minutes} more"
+                               f" minute{'s' if minutes > 1 else ''} ({tries} wrong from it,"
+                               f" {all_tries} from everyone, in {LOCKOUT_WINDOW // 60} minutes)")
+        else:
+            error, status = "That's not the password", 401
+            app.logger.warning(f"wrong password from {address} ({tries} of {LOCKOUT_PER_ADDRESS}"
+                               f" in {LOCKOUT_WINDOW // 60} minutes; {all_tries} of {LOCKOUT_ALL} from everyone)")
+    return render_template('login.html', error=error, next=request.values.get('next', '')), status
 
 
 @app.post('/logout')
 def logout():
+    app.logger.info(f"logout from {client_address()}")
     session.clear()
     return redirect(url_for('login'))
 

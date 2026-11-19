@@ -18,6 +18,10 @@
 # over HTTPS with its own certificate). Settings go in a .env file next to
 # this one:
 #   APP_PASSWORD=the-site-password
+# and, optionally, how long a login lasts (days; guests' default is 7), and
+# SECURE_COOKIE=off only for a site reached over plain http, without HTTPS:
+#   LOGIN_DAYS=30
+#   GUEST_LOGIN_DAYS=7
 # and, only on a private site, to check routes on real roads with Google
 # (every check is billed to the key's Google account):
 #   GOOGLE_CHECK=on
@@ -34,6 +38,8 @@ services:
     build: .
     environment:
       APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in .env}
+      LOGIN_DAYS: ${LOGIN_DAYS:-30}
+      SECURE_COOKIE: ${SECURE_COOKIE:-on}
       GOOGLE_CHECK: ${GOOGLE_CHECK:-off}
       GMAPS_API_KEY: ${GMAPS_API_KEY:-}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
@@ -56,6 +62,9 @@ services:
     environment:
       # Empty stops it at start-up with "set APP_PASSWORD"; set GUEST_PASSWORD
       APP_PASSWORD: ${GUEST_PASSWORD:-}
+      # Guests' logins end sooner than yours
+      LOGIN_DAYS: ${GUEST_LOGIN_DAYS:-7}
+      SECURE_COOKIE: ${SECURE_COOKIE:-on}
       GOOGLE_CHECK: "off"
       PLANNER_WORKERS: 4
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
