@@ -1426,6 +1426,17 @@ logged in carry on. The address is Cloudflare's `CF-Connecting-IP`, so
 behind a tunnel each visitor counts separately. The counts are kept in
 memory, so restarting the app clears a lockout.
 
+Every login, logout, wrong password and lockout goes to the log
+(`docker compose logs app`, or `guest`) with the visitor's address and how
+close it is to a lockout, e.g.
+
+    WARNING in app: wrong password from 203.0.113.7 (3 of 10 in 10 minutes; 3 of 100 from everyone)
+    WARNING in app: login refused from 203.0.113.7: locked out for 8 more minutes (10 wrong from it, 10 from everyone, in 10 minutes)
+    INFO in app: login from 198.51.100.4
+
+The password typed is never logged. To see only these:
+`docker compose logs app | grep -E 'login|logout|password'`.
+
 - **New bonus data:** run step 1 again here, and copy the two CSVs into
   `data/` on the server as in step 2. No restart needed; runs with the new
   data are planned fresh, and earlier ones stay listed.

@@ -71,7 +71,7 @@ Environment:
 
     APP_PASSWORD=secret SECURE_COOKIE=off flask --app webapp/app.py run    # to try it locally
 """
-import argparse, glob, hashlib, hmac, json, math, os, queue, re, shutil, sys, threading, time
+import argparse, glob, hashlib, hmac, json, logging, math, os, queue, re, shutil, sys, threading, time
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -187,6 +187,9 @@ app.secret_key = _site_key.digest()
 app.config.update(SESSION_COOKIE_NAME='rally_' + _site_key.hexdigest()[:10],
                   SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=SECURE_COOKIE,
                   PERMANENT_SESSION_LIFETIME=timedelta(days=LOGIN_DAYS))
+# Logins, wrong passwords and lockouts go to the log (docker compose logs),
+# with the visitor's address; never the password typed
+app.logger.setLevel(logging.INFO)
 
 # Wrong passwords, to stop guessing: 10 from one address in 10 minutes locks
 # that address out until the oldest is 10 minutes old, and 100 from everyone
@@ -282,7 +285,10 @@ def login():
             if not wait and not right:
                 failed_logins.setdefault(address, deque()).append(now)
                 all_failed_logins.append(now)
+            tries = len(failed_logins.get(address, ()))
+            all_tries = len(all_failed_logins)
         if right:
+            app.logger.info(f"login from {address}")
             session.clear()
             session.permanent = True
             session['logged_in'] = True
@@ -291,13 +297,19 @@ def login():
             minutes = max(1, math.ceil(wait / 60))
             error = f"Too many wrong passwords. Try again in {minutes} minute{'s' if minutes > 1 else ''}"
             status = 429
+            app.logger.warning(f"login refused from {address}: locked out for {minutes} more"
+                               f" minute{'s' if minutes > 1 else ''} ({tries} wrong from it,"
+                               f" {all_tries} from everyone, in {LOCKOUT_WINDOW // 60} minutes)")
         else:
             error, status = "That's not the password", 401
+            app.logger.warning(f"wrong password from {address} ({tries} of {LOCKOUT_PER_ADDRESS}"
+                               f" in {LOCKOUT_WINDOW // 60} minutes; {all_tries} of {LOCKOUT_ALL} from everyone)")
     return render_template('login.html', error=error, next=request.values.get('next', '')), status
 
 
 @app.post('/logout')
 def logout():
+    app.logger.info(f"logout from {client_address()}")
     session.clear()
     return redirect(url_for('login'))
 
